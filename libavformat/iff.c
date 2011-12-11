@@ -4,20 +4,20 @@
  * Copyright (c) 2010 Peter Ross <pross@xvid.org>
  * Copyright (c) 2010 Sebastian Vater <cdgs.basty@googlemail.com>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -30,8 +30,9 @@
  */
 
 #include "libavutil/intreadwrite.h"
-#include "libavcodec/iff.h"
+#include "libavutil/dict.h"
 #include "avformat.h"
+#include "internal.h"
 
 #define ID_8SVX       MKTAG('8','S','V','X')
 #define ID_VHDR       MKTAG('V','H','D','R')
@@ -59,8 +60,6 @@
 #define RIGHT   4
 #define STEREO  6
 
-#define PACKET_SIZE 1024
-
 typedef enum {
     COMP_NONE,
     COMP_FIB,
@@ -76,21 +75,8 @@ typedef struct {
     uint64_t  body_pos;
     uint32_t  body_size;
     uint32_t  sent_bytes;
-    uint32_t  audio_frame_count;
 } IffDemuxContext;
 
-
-static void interleave_stereo(const uint8_t *src, uint8_t *dest, int size)
-{
-    uint8_t *end = dest + size;
-    size = size>>1;
-
-    while(dest < end) {
-        *dest++ = *src;
-        *dest++ = *(src+size);
-        src++;
-    }
-}
 
 /* Metadata string read */
 static int get_metadata(AVFormatContext *s,
@@ -102,12 +88,12 @@ static int get_metadata(AVFormatContext *s,
     if (!buf)
         return AVERROR(ENOMEM);
 
-    if (get_buffer(s->pb, buf, data_size) < 0) {
+    if (avio_read(s->pb, buf, data_size) < 0) {
         av_free(buf);
         return AVERROR(EIO);
     }
     buf[data_size] = 0;
-    av_metadata_set2(&s->metadata, tag, buf, AV_METADATA_DONT_STRDUP_VAL);
+    av_dict_set(&s->metadata, tag, buf, AV_DICT_DONT_STRDUP_VAL);
     return 0;
 }
 
@@ -125,27 +111,27 @@ static int iff_read_header(AVFormatContext *s,
                            AVFormatParameters *ap)
 {
     IffDemuxContext *iff = s->priv_data;
-    ByteIOContext *pb = s->pb;
+    AVIOContext *pb = s->pb;
     AVStream *st;
     uint32_t chunk_id, data_size;
     int compression = -1;
 
-    st = av_new_stream(s, 0);
+    st = avformat_new_stream(s, NULL);
     if (!st)
         return AVERROR(ENOMEM);
 
     st->codec->channels = 1;
-    url_fskip(pb, 8);
+    avio_skip(pb, 8);
     // codec_tag used by ByteRun1 decoder to distinguish progressive (PBM) and interlaced (ILBM) content
-    st->codec->codec_tag = get_le32(pb);
+    st->codec->codec_tag = avio_rl32(pb);
 
-    while(!url_feof(pb)) {
+    while(!pb->eof_reached) {
         uint64_t orig_pos;
         int res;
         const char *metadata_tag = NULL;
-        chunk_id = get_le32(pb);
-        data_size = get_be32(pb);
-        orig_pos = url_ftell(pb);
+        chunk_id = avio_rl32(pb);
+        data_size = avio_rb32(pb);
+        orig_pos = avio_tell(pb);
 
         switch(chunk_id) {
         case ID_VHDR:
@@ -153,23 +139,23 @@ static int iff_read_header(AVFormatContext *s,
 
             if (data_size < 14)
                 return AVERROR_INVALIDDATA;
-            url_fskip(pb, 12);
-            st->codec->sample_rate = get_be16(pb);
+            avio_skip(pb, 12);
+            st->codec->sample_rate = avio_rb16(pb);
             if (data_size >= 16) {
-                url_fskip(pb, 1);
-                compression        = get_byte(pb);
+                avio_skip(pb, 1);
+                compression        = avio_r8(pb);
             }
             break;
 
         case ID_BODY:
-            iff->body_pos = url_ftell(pb);
+            iff->body_pos = avio_tell(pb);
             iff->body_size = data_size;
             break;
 
         case ID_CHAN:
             if (data_size < 4)
                 return AVERROR_INVALIDDATA;
-            st->codec->channels = (get_be32(pb) < 6) ? 1 : 2;
+            st->codec->channels = (avio_rb32(pb) < 6) ? 1 : 2;
             break;
 
         case ID_CMAP:
@@ -177,7 +163,7 @@ static int iff_read_header(AVFormatContext *s,
             st->codec->extradata      = av_malloc(data_size);
             if (!st->codec->extradata)
                 return AVERROR(ENOMEM);
-            if (get_buffer(pb, st->codec->extradata, data_size) < 0)
+            if (avio_read(pb, st->codec->extradata, data_size) < 0)
                 return AVERROR(EIO);
             break;
 
@@ -185,18 +171,18 @@ static int iff_read_header(AVFormatContext *s,
             st->codec->codec_type            = AVMEDIA_TYPE_VIDEO;
             if (data_size <= 8)
                 return AVERROR_INVALIDDATA;
-            st->codec->width                 = get_be16(pb);
-            st->codec->height                = get_be16(pb);
-            url_fskip(pb, 4); // x, y offset
-            st->codec->bits_per_coded_sample = get_byte(pb);
+            st->codec->width                 = avio_rb16(pb);
+            st->codec->height                = avio_rb16(pb);
+            avio_skip(pb, 4); // x, y offset
+            st->codec->bits_per_coded_sample = avio_r8(pb);
             if (data_size >= 11) {
-                url_fskip(pb, 1); // masking
-                compression                  = get_byte(pb);
+                avio_skip(pb, 1); // masking
+                compression                  = avio_r8(pb);
             }
             if (data_size >= 16) {
-                url_fskip(pb, 3); // paddding, transparent
-                st->sample_aspect_ratio.num  = get_byte(pb);
-                st->sample_aspect_ratio.den  = get_byte(pb);
+                avio_skip(pb, 3); // paddding, transparent
+                st->sample_aspect_ratio.num  = avio_r8(pb);
+                st->sample_aspect_ratio.den  = avio_r8(pb);
             }
             break;
 
@@ -224,18 +210,18 @@ static int iff_read_header(AVFormatContext *s,
                 return res;
             }
         }
-        url_fskip(pb, data_size - (url_ftell(pb) - orig_pos) + (data_size & 1));
+        avio_skip(pb, data_size - (avio_tell(pb) - orig_pos) + (data_size & 1));
     }
 
-    url_fseek(pb, iff->body_pos, SEEK_SET);
+    avio_seek(pb, iff->body_pos, SEEK_SET);
 
     switch(st->codec->codec_type) {
     case AVMEDIA_TYPE_AUDIO:
-        av_set_pts_info(st, 32, 1, st->codec->sample_rate);
+        avpriv_set_pts_info(st, 32, 1, st->codec->sample_rate);
 
         switch(compression) {
         case COMP_NONE:
-            st->codec->codec_id = CODEC_ID_PCM_S8;
+            st->codec->codec_id = CODEC_ID_PCM_S8_PLANAR;
             break;
         case COMP_FIB:
             st->codec->codec_id = CODEC_ID_8SVX_FIB;
@@ -277,49 +263,29 @@ static int iff_read_packet(AVFormatContext *s,
                            AVPacket *pkt)
 {
     IffDemuxContext *iff = s->priv_data;
-    ByteIOContext *pb = s->pb;
-    AVStream *st = s->streams[0];
+    AVIOContext *pb = s->pb;
     int ret;
 
     if(iff->sent_bytes >= iff->body_size)
-        return AVERROR(EIO);
+        return AVERROR_EOF;
 
-    if(st->codec->channels == 2) {
-        uint8_t sample_buffer[PACKET_SIZE];
-
-        ret = get_buffer(pb, sample_buffer, PACKET_SIZE);
-        if(av_new_packet(pkt, PACKET_SIZE) < 0) {
-            av_log(s, AV_LOG_ERROR, "cannot allocate packet\n");
-            return AVERROR(ENOMEM);
-        }
-        interleave_stereo(sample_buffer, pkt->data, PACKET_SIZE);
-    } else if (st->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
-        ret = av_get_packet(pb, pkt, iff->body_size);
-    } else {
-        ret = av_get_packet(pb, pkt, PACKET_SIZE);
-    }
+    ret = av_get_packet(pb, pkt, iff->body_size);
+    if (ret < 0)
+        return ret;
 
     if(iff->sent_bytes == 0)
         pkt->flags |= AV_PKT_FLAG_KEY;
+    iff->sent_bytes = iff->body_size;
 
-    if(st->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
-        iff->sent_bytes += PACKET_SIZE;
-    } else {
-        iff->sent_bytes = iff->body_size;
-    }
     pkt->stream_index = 0;
-    if(st->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
-        pkt->pts = iff->audio_frame_count;
-        iff->audio_frame_count += ret / st->codec->channels;
-    }
     return ret;
 }
 
-AVInputFormat iff_demuxer = {
-    "IFF",
-    NULL_IF_CONFIG_SMALL("IFF format"),
-    sizeof(IffDemuxContext),
-    iff_probe,
-    iff_read_header,
-    iff_read_packet,
+AVInputFormat ff_iff_demuxer = {
+    .name           = "IFF",
+    .long_name      = NULL_IF_CONFIG_SMALL("IFF format"),
+    .priv_data_size = sizeof(IffDemuxContext),
+    .read_probe     = iff_probe,
+    .read_header    = iff_read_header,
+    .read_packet    = iff_read_packet,
 };

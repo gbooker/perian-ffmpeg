@@ -2,20 +2,20 @@
  * iWMMXt optimized DSP utils
  * Copyright (c) 2004 AGAWA Koji
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -155,6 +155,7 @@ static void nop(uint8_t *block, const uint8_t *pixels, int line_size, int h)
 void ff_dsputil_init_iwmmxt(DSPContext* c, AVCodecContext *avctx)
 {
     int mm_flags = AV_CPU_FLAG_IWMMXT; /* multimedia extension flags */
+    const int high_bit_depth = avctx->bits_per_raw_sample > 8;
 
     if (avctx->dsp_mask) {
         if (avctx->dsp_mask & AV_CPU_FLAG_FORCE)
@@ -167,6 +168,7 @@ void ff_dsputil_init_iwmmxt(DSPContext* c, AVCodecContext *avctx)
 
     c->add_pixels_clamped = add_pixels_clamped_iwmmxt;
 
+    if (!high_bit_depth) {
     c->clear_blocks = clear_blocks_iwmmxt;
 
     c->put_pixels_tab[0][0] = put_pixels16_iwmmxt;
@@ -204,4 +206,5 @@ void ff_dsputil_init_iwmmxt(DSPContext* c, AVCodecContext *avctx)
     c->avg_no_rnd_pixels_tab[1][1] = avg_no_rnd_pixels8_x2_iwmmxt;
     c->avg_no_rnd_pixels_tab[1][2] = avg_no_rnd_pixels8_y2_iwmmxt;
     c->avg_no_rnd_pixels_tab[1][3] = avg_no_rnd_pixels8_xy2_iwmmxt;
+    }
 }

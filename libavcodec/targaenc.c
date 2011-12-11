@@ -2,24 +2,25 @@
  * Targa (.tga) image encoder
  * Copyright (c) 2007 Bobby Bingham
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include "libavutil/intreadwrite.h"
+#include "libavutil/pixdesc.h"
 #include "avcodec.h"
 #include "rle.h"
 #include "targa.h"
@@ -90,7 +91,7 @@ static int targa_encode_frame(AVCodecContext *avctx,
         return AVERROR(EINVAL);
     }
 
-    p->pict_type= FF_I_TYPE;
+    p->pict_type= AV_PICTURE_TYPE_I;
     p->key_frame= 1;
 
     /* zero out the header and only set applicable fields */
@@ -119,7 +120,7 @@ static int targa_encode_frame(AVCodecContext *avctx,
         break;
     default:
         av_log(avctx, AV_LOG_ERROR, "Pixel format '%s' not supported.\n",
-               avcodec_get_pix_fmt_name(avctx->pix_fmt));
+               av_get_pix_fmt_name(avctx->pix_fmt));
         return AVERROR(EINVAL);
     }
     bpp = outbuf[16] >> 3;
@@ -158,7 +159,7 @@ static av_cold int targa_encode_init(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec targa_encoder = {
+AVCodec ff_targa_encoder = {
     .name = "targa",
     .type = AVMEDIA_TYPE_VIDEO,
     .id = CODEC_ID_TARGA,

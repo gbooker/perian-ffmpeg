@@ -2,20 +2,20 @@
  * Copyright (c) 2010 Stefano Sabatini
  * Copyright (c) 2008 Victor Paesa
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -27,6 +27,7 @@
 /* #define DEBUG */
 
 #include "libavutil/eval.h"
+#include "libavutil/mathematics.h"
 #include "avfilter.h"
 
 static const char *var_names[] = {
@@ -116,10 +117,10 @@ static void start_frame(AVFilterLink *inlink, AVFilterBufferRef *inpicref)
 
 #ifdef DEBUG
     av_log(inlink->dst, AV_LOG_DEBUG,
-           "n:%"PRId64" interlaced:%d pos:%d pts:%"PRId64" t:%f -> pts:%"PRId64" t:%f\n",
+           "n:%"PRId64" interlaced:%d pos:%"PRId64" pts:%"PRId64" t:%f -> pts:%"PRId64" t:%f\n",
            (int64_t)setpts->var_values[VAR_N],
            (int)setpts->var_values[VAR_INTERLACED],
-           (int)setpts->var_values[VAR_POS],
+           inpicref ->pos,
            inpicref ->pts, inpicref ->pts * av_q2d(inlink->time_base),
            outpicref->pts, outpicref->pts * av_q2d(inlink->time_base));
 #endif

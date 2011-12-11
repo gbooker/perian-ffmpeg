@@ -2,20 +2,20 @@
  * 4XM codec
  * Copyright (c) 2003 Michael Niedermayer
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -277,7 +277,7 @@ static void init_mv(FourXContext *f){
     }
 #endif
 
-static inline void mcdc(uint16_t *dst, uint16_t *src, int log2w, int h, int stride, int scale, int dc){
+static inline void mcdc(uint16_t *dst, uint16_t *src, int log2w, int h, int stride, int scale, unsigned dc){
    int i;
    dc*= 0x10001;
 
@@ -399,6 +399,7 @@ static int decode_p_frame(FourXContext *f, const uint8_t *buf, int length){
     if (!f->bitstream_buffer)
         return AVERROR(ENOMEM);
     f->dsp.bswap_buf(f->bitstream_buffer, (const uint32_t*)(buf + extra), bitstream_size/4);
+    memset((uint8_t*)f->bitstream_buffer + bitstream_size, 0, FF_INPUT_BUFFER_PADDING_SIZE);
     init_get_bits(&f->gb, f->bitstream_buffer, 8*bitstream_size);
 
     f->wordstream= (const uint16_t*)(buf + extra + bitstream_size);
@@ -601,9 +602,10 @@ static const uint8_t *read_huffman_tables(FourXContext *f, const uint8_t * const
         len_tab[j]= len;
     }
 
-    init_vlc(&f->pre_vlc, ACDC_VLC_BITS, 257,
-             len_tab , 1, 1,
-             bits_tab, 4, 4, 0);
+    if (init_vlc(&f->pre_vlc, ACDC_VLC_BITS, 257,
+                 len_tab , 1, 1,
+                 bits_tab, 4, 4, 0))
+        return NULL;
 
     return ptr;
 }
@@ -679,6 +681,7 @@ static int decode_i_frame(FourXContext *f, const uint8_t *buf, int length){
     if (!f->bitstream_buffer)
         return AVERROR(ENOMEM);
     f->dsp.bswap_buf(f->bitstream_buffer, (const uint32_t*)prestream, prestream_size/4);
+    memset((uint8_t*)f->bitstream_buffer + prestream_size, 0, FF_INPUT_BUFFER_PADDING_SIZE);
     init_get_bits(&f->pre_gb, f->bitstream_buffer, 8*prestream_size);
 
     f->last_dc= 0*128*8*8;
@@ -783,11 +786,11 @@ static int decode_frame(AVCodecContext *avctx,
     }
 
     if(frame_4cc == AV_RL32("ifr2")){
-        p->pict_type= FF_I_TYPE;
+        p->pict_type= AV_PICTURE_TYPE_I;
         if(decode_i2_frame(f, buf-4, frame_size) < 0)
             return -1;
     }else if(frame_4cc == AV_RL32("ifrm")){
-        p->pict_type= FF_I_TYPE;
+        p->pict_type= AV_PICTURE_TYPE_I;
         if(decode_i_frame(f, buf, frame_size) < 0)
             return -1;
     }else if(frame_4cc == AV_RL32("pfrm") || frame_4cc == AV_RL32("pfr2")){
@@ -799,7 +802,7 @@ static int decode_frame(AVCodecContext *avctx,
             }
         }
 
-        p->pict_type= FF_P_TYPE;
+        p->pict_type= AV_PICTURE_TYPE_P;
         if(decode_p_frame(f, buf, frame_size) < 0)
             return -1;
     }else if(frame_4cc == AV_RL32("snd_")){
@@ -808,7 +811,7 @@ static int decode_frame(AVCodecContext *avctx,
         av_log(avctx, AV_LOG_ERROR, "ignoring unknown chunk length:%d\n", buf_size);
     }
 
-    p->key_frame= p->pict_type == FF_I_TYPE;
+    p->key_frame= p->pict_type == AV_PICTURE_TYPE_I;
 
     *picture= *p;
     *data_size = sizeof(AVPicture);
@@ -865,16 +868,15 @@ static av_cold int decode_end(AVCodecContext *avctx){
     return 0;
 }
 
-AVCodec fourxm_decoder = {
-    "4xm",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_4XM,
-    sizeof(FourXContext),
-    decode_init,
-    NULL,
-    decode_end,
-    decode_frame,
-    CODEC_CAP_DR1,
+AVCodec ff_fourxm_decoder = {
+    .name           = "4xm",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_4XM,
+    .priv_data_size = sizeof(FourXContext),
+    .init           = decode_init,
+    .close          = decode_end,
+    .decode         = decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("4X Movie"),
 };
 

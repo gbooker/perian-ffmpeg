@@ -2,20 +2,20 @@
  * Real Audio 1.0 (14.4K)
  * Copyright (c) 2003 the ffmpeg project
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -23,7 +23,7 @@
 #define AVCODEC_RA144_H
 
 #include <stdint.h>
-#include "dsputil.h"
+#include "lpc.h"
 
 #define NBLOCKS         4       ///< number of subblocks within a block
 #define BLOCKSIZE       40      ///< subblock size in 16-bit words
@@ -34,7 +34,8 @@
 
 typedef struct {
     AVCodecContext *avctx;
-    DSPContext dsp;
+    AVFrame frame;
+    LPCContext lpc_ctx;
 
     unsigned int     old_energy;        ///< previous frame energy
 
@@ -56,8 +57,6 @@ typedef struct {
     uint16_t adapt_cb[146+2];
 } RA144Context;
 
-void ff_add_wav(int16_t *dest, int n, int skip_first, int *m, const int16_t *s1,
-                const int8_t *s2, const int8_t *s3);
 void ff_copy_and_dup(int16_t *target, const int16_t *source, int offset);
 int ff_eval_refl(int *refl, const int16_t *coefs, AVCodecContext *avctx);
 void ff_eval_coefs(int *coefs, const int *refl);

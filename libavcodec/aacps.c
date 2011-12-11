@@ -2,20 +2,20 @@
  * MPEG-4 Parametric Stereo decoding functions
  * Copyright (c) 2010 Alex Converse <alex.converse@gmail.com>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -28,9 +28,9 @@
 #include "aacps_tablegen.h"
 #include "aacpsdata.c"
 
-#define PS_BASELINE 0  //< Operate in Baseline PS mode
-                       //< Baseline implies 10 or 20 stereo bands,
-                       //< mixing mode A, and no ipd/opd
+#define PS_BASELINE 0  ///< Operate in Baseline PS mode
+                       ///< Baseline implies 10 or 20 stereo bands,
+                       ///< mixing mode A, and no ipd/opd
 
 #define numQMFSlots 32 //numTimeSlots * RATE
 
@@ -69,19 +69,19 @@ static const int huff_iid[] = {
 
 static VLC vlc_ps[10];
 
-/**
- * Read Inter-channel Intensity Difference/Inter-Channel Coherence/
- * Inter-channel Phase Difference/Overall Phase Difference parameters from the
- * bitstream.
- *
- * @param avctx contains the current codec context
- * @param gb    pointer to the input bitstream
- * @param ps    pointer to the Parametric Stereo context
- * @param par   pointer to the parameter to be read
- * @param e     envelope to decode
- * @param dt    1: time delta-coded, 0: frequency delta-coded
- */
 #define READ_PAR_DATA(PAR, OFFSET, MASK, ERR_CONDITION) \
+/** \
+ * Read Inter-channel Intensity Difference/Inter-Channel Coherence/ \
+ * Inter-channel Phase Difference/Overall Phase Difference parameters from the \
+ * bitstream. \
+ * \
+ * @param avctx contains the current codec context \
+ * @param gb    pointer to the input bitstream \
+ * @param ps    pointer to the Parametric Stereo context \
+ * @param PAR   pointer to the parameter to be read \
+ * @param e     envelope to decode \
+ * @param dt    1: time delta-coded, 0: frequency delta-coded \
+ */ \
 static int read_ ## PAR ## _data(AVCodecContext *avctx, GetBitContext *gb, PSContext *ps, \
                         int8_t (*PAR)[PS_MAX_NR_IIDICC], int table_idx, int e, int dt) \
 { \
@@ -654,7 +654,7 @@ static void decorrelation(PSContext *ps, float (*out)[32][2], const float (*s)[3
     const int8_t *k_to_i = is34 ? k_to_i_34 : k_to_i_20;
     const float peak_decay_factor = 0.76592833836465f;
     const float transient_impact  = 1.5f;
-    const float a_smooth          = 0.25f; //< Smoothing coefficient
+    const float a_smooth          = 0.25f; ///< Smoothing coefficient
     int i, k, m, n;
     int n0 = 0, nL = 32;
     static const int link_delay[] = { 3, 4, 5 };
@@ -813,14 +813,17 @@ static void stereo_processing(PSContext *ps, float (*l)[32][2], float (*r)[32][2
     const float (*H_LUT)[8][4] = (PS_BASELINE || ps->icc_mode < 3) ? HA : HB;
 
     //Remapping
-    memcpy(H11[0][0], H11[0][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H11[0][0][0]));
-    memcpy(H11[1][0], H11[1][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H11[1][0][0]));
-    memcpy(H12[0][0], H12[0][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H12[0][0][0]));
-    memcpy(H12[1][0], H12[1][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H12[1][0][0]));
-    memcpy(H21[0][0], H21[0][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H21[0][0][0]));
-    memcpy(H21[1][0], H21[1][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H21[1][0][0]));
-    memcpy(H22[0][0], H22[0][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H22[0][0][0]));
-    memcpy(H22[1][0], H22[1][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H22[1][0][0]));
+    if (ps->num_env_old) {
+        memcpy(H11[0][0], H11[0][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H11[0][0][0]));
+        memcpy(H11[1][0], H11[1][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H11[1][0][0]));
+        memcpy(H12[0][0], H12[0][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H12[0][0][0]));
+        memcpy(H12[1][0], H12[1][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H12[1][0][0]));
+        memcpy(H21[0][0], H21[0][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H21[0][0][0]));
+        memcpy(H21[1][0], H21[1][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H21[1][0][0]));
+        memcpy(H22[0][0], H22[0][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H22[0][0][0]));
+        memcpy(H22[1][0], H22[1][ps->num_env_old], PS_MAX_NR_IIDICC*sizeof(H22[1][0][0]));
+    }
+
     if (is34) {
         remap34(&iid_mapped, ps->iid_par, ps->nr_iid_par, ps->num_env, 1);
         remap34(&icc_mapped, ps->icc_par, ps->nr_icc_par, ps->num_env, 1);

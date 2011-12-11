@@ -1,21 +1,21 @@
 /*
- * FFprobe : Simple Media Prober based on the FFmpeg libraries
+ * avprobe : Simple Media Prober based on the Libav libraries
  * Copyright (c) 2007-2010 Stefano Sabatini
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -23,12 +23,13 @@
 
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
-#include "libavcodec/opt.h"
+#include "libavutil/opt.h"
 #include "libavutil/pixdesc.h"
+#include "libavutil/dict.h"
 #include "libavdevice/avdevice.h"
 #include "cmdutils.h"
 
-const char program_name[] = "FFprobe";
+const char program_name[] = "avprobe";
 const int program_birth_year = 2007;
 
 static int do_show_format  = 0;
@@ -43,7 +44,7 @@ static int use_value_sexagesimal_format = 0;
 /* globals */
 static const OptionDef options[];
 
-/* FFprobe context */
+/* AVprobe context */
 static const char *input_filename;
 static AVInputFormat *iformat = NULL;
 
@@ -54,6 +55,11 @@ static const char *unit_second_str          = "s"    ;
 static const char *unit_hertz_str           = "Hz"   ;
 static const char *unit_byte_str            = "byte" ;
 static const char *unit_bit_per_second_str  = "bit/s";
+
+void exit_program(int ret)
+{
+    exit(ret);
+}
 
 static char *value_string(char *buf, int buf_size, double val, const char *unit)
 {
@@ -160,7 +166,7 @@ static void show_stream(AVFormatContext *fmt_ctx, int stream_idx)
     AVCodecContext *dec_ctx;
     AVCodec *dec;
     char val_str[128];
-    AVMetadataTag *tag = NULL;
+    AVDictionaryEntry *tag = NULL;
     AVRational display_aspect_ratio;
 
     printf("[STREAM]\n");
@@ -200,6 +206,7 @@ static void show_stream(AVFormatContext *fmt_ctx, int stream_idx)
             }
             printf("pix_fmt=%s\n",                 dec_ctx->pix_fmt != PIX_FMT_NONE ?
                    av_pix_fmt_descriptors[dec_ctx->pix_fmt].name : "unknown");
+            printf("level=%d\n",                   dec_ctx->level);
             break;
 
         case AVMEDIA_TYPE_AUDIO:
@@ -226,7 +233,7 @@ static void show_stream(AVFormatContext *fmt_ctx, int stream_idx)
     if (stream->nb_frames)
         printf("nb_frames=%"PRId64"\n",    stream->nb_frames);
 
-    while ((tag = av_metadata_get(stream->metadata, "", tag, AV_METADATA_IGNORE_SUFFIX)))
+    while ((tag = av_dict_get(stream->metadata, "", tag, AV_DICT_IGNORE_SUFFIX)))
         printf("TAG:%s=%s\n", tag->key, tag->value);
 
     printf("[/STREAM]\n");
@@ -234,7 +241,7 @@ static void show_stream(AVFormatContext *fmt_ctx, int stream_idx)
 
 static void show_format(AVFormatContext *fmt_ctx)
 {
-    AVMetadataTag *tag = NULL;
+    AVDictionaryEntry *tag = NULL;
     char val_str[128];
 
     printf("[FORMAT]\n");
@@ -252,7 +259,7 @@ static void show_format(AVFormatContext *fmt_ctx)
     printf("bit_rate=%s\n",         value_string(val_str, sizeof(val_str), fmt_ctx->bit_rate,
                                                  unit_bit_per_second_str));
 
-    while ((tag = av_metadata_get(fmt_ctx->metadata, "", tag, AV_METADATA_IGNORE_SUFFIX)))
+    while ((tag = av_dict_get(fmt_ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX)))
         printf("TAG:%s=%s\n", tag->key, tag->value);
 
     printf("[/FORMAT]\n");
@@ -261,23 +268,26 @@ static void show_format(AVFormatContext *fmt_ctx)
 static int open_input_file(AVFormatContext **fmt_ctx_ptr, const char *filename)
 {
     int err, i;
-    AVFormatContext *fmt_ctx;
+    AVFormatContext *fmt_ctx = NULL;
+    AVDictionaryEntry *t;
 
-    fmt_ctx = avformat_alloc_context();
-    set_context_opts(fmt_ctx, avformat_opts, AV_OPT_FLAG_DECODING_PARAM, NULL);
-
-    if ((err = av_open_input_file(&fmt_ctx, filename, iformat, 0, NULL)) < 0) {
+    if ((err = avformat_open_input(&fmt_ctx, filename, iformat, &format_opts)) < 0) {
         print_error(filename, err);
         return err;
     }
+    if ((t = av_dict_get(format_opts, "", NULL, AV_DICT_IGNORE_SUFFIX))) {
+        av_log(NULL, AV_LOG_ERROR, "Option %s not found.\n", t->key);
+        return AVERROR_OPTION_NOT_FOUND;
+    }
+
 
     /* fill the streams in the format context */
-    if ((err = av_find_stream_info(fmt_ctx)) < 0) {
+    if ((err = avformat_find_stream_info(fmt_ctx, NULL)) < 0) {
         print_error(filename, err);
         return err;
     }
 
-    dump_format(fmt_ctx, 0, filename, 0);
+    av_dump_format(fmt_ctx, 0, filename, 0);
 
     /* bind a decoder to each input stream */
     for (i = 0; i < fmt_ctx->nb_streams; i++) {
@@ -285,9 +295,9 @@ static int open_input_file(AVFormatContext **fmt_ctx_ptr, const char *filename)
         AVCodec *codec;
 
         if (!(codec = avcodec_find_decoder(stream->codec->codec_id))) {
-            fprintf(stderr, "Unsupported codec (id=%d) for input stream %d\n",
+            fprintf(stderr, "Unsupported codec with id %d for input stream %d\n",
                     stream->codec->codec_id, stream->index);
-        } else if (avcodec_open(stream->codec, codec) < 0) {
+        } else if (avcodec_open2(stream->codec, codec, NULL) < 0) {
             fprintf(stderr, "Error while opening codec for input stream %d\n",
                     stream->index);
         }
@@ -322,20 +332,21 @@ static int probe_file(const char *filename)
 static void show_usage(void)
 {
     printf("Simple multimedia streams analyzer\n");
-    printf("usage: ffprobe [OPTIONS] [INPUT_FILE]\n");
+    printf("usage: %s [OPTIONS] [INPUT_FILE]\n", program_name);
     printf("\n");
 }
 
-static void opt_format(const char *arg)
+static int opt_format(const char *opt, const char *arg)
 {
     iformat = av_find_input_format(arg);
     if (!iformat) {
         fprintf(stderr, "Unknown input format: %s\n", arg);
-        exit(1);
+        return AVERROR(EINVAL);
     }
+    return 0;
 }
 
-static void opt_input_file(const char *arg)
+static void opt_input_file(void *optctx, const char *arg)
 {
     if (input_filename) {
         fprintf(stderr, "Argument '%s' provided as input filename, but '%s' was already specified.\n",
@@ -353,8 +364,7 @@ static void show_help(void)
     show_usage();
     show_help_options(options, "Main options:\n", 0, 0);
     printf("\n");
-    av_opt_show2(avformat_opts, NULL,
-                 AV_OPT_FLAG_DECODING_PARAM, 0);
+    show_help_children(avformat_get_class(), AV_OPT_FLAG_DECODING_PARAM);
 }
 
 static void opt_pretty(void)
@@ -379,7 +389,7 @@ static const OptionDef options[] = {
     { "show_format",  OPT_BOOL, {(void*)&do_show_format} , "show format/container info" },
     { "show_packets", OPT_BOOL, {(void*)&do_show_packets}, "show packets info" },
     { "show_streams", OPT_BOOL, {(void*)&do_show_streams}, "show streams info" },
-    { "default", OPT_FUNC2 | HAS_ARG | OPT_AUDIO | OPT_VIDEO | OPT_EXPERT, {(void*)opt_default}, "generic catch all option", "" },
+    { "default", HAS_ARG | OPT_AUDIO | OPT_VIDEO | OPT_EXPERT, {(void*)opt_default}, "generic catch all option", "" },
     { NULL, },
 };
 
@@ -387,26 +397,27 @@ int main(int argc, char **argv)
 {
     int ret;
 
+    parse_loglevel(argc, argv, options);
     av_register_all();
+    avformat_network_init();
+    init_opts();
 #if CONFIG_AVDEVICE
     avdevice_register_all();
 #endif
 
-    avformat_opts = avformat_alloc_context();
-
     show_banner();
-    parse_options(argc, argv, options, opt_input_file);
+    parse_options(NULL, argc, argv, options, opt_input_file);
 
     if (!input_filename) {
         show_usage();
         fprintf(stderr, "You have to specify one input file.\n");
-        fprintf(stderr, "Use -h to get full help or, even better, run 'man ffprobe'.\n");
+        fprintf(stderr, "Use -h to get full help or, even better, run 'man %s'.\n", program_name);
         exit(1);
     }
 
     ret = probe_file(input_filename);
 
-    av_free(avformat_opts);
+    avformat_network_deinit();
 
     return ret;
 }

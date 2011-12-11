@@ -2,20 +2,20 @@
  * Interface to libmp3lame for mp3 encoding
  * Copyright (c) 2002 Lennert Buytenhek <buytenh@gnu.org>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -24,16 +24,21 @@
  * Interface to libmp3lame for mp3 encoding.
  */
 
+#include "libavutil/intreadwrite.h"
+#include "libavutil/log.h"
+#include "libavutil/opt.h"
 #include "avcodec.h"
 #include "mpegaudio.h"
 #include <lame/lame.h>
 
 #define BUFFER_SIZE (7200 + 2*MPA_FRAME_SIZE + MPA_FRAME_SIZE/4)
 typedef struct Mp3AudioContext {
+    AVClass *class;
     lame_global_flags *gfp;
     int stereo;
     uint8_t buffer[BUFFER_SIZE];
     int buffer_index;
+    int reservoir;
 } Mp3AudioContext;
 
 static av_cold int MP3lame_encode_init(AVCodecContext *avctx)
@@ -63,7 +68,10 @@ static av_cold int MP3lame_encode_init(AVCodecContext *avctx)
         lame_set_VBR_quality(s->gfp, avctx->global_quality/(float)FF_QP2LAMBDA);
     }
     lame_set_bWriteVbrTag(s->gfp,0);
-    lame_set_disable_reservoir(s->gfp, avctx->flags2 & CODEC_FLAG2_BIT_RESERVOIR ? 0 : 1);
+#if FF_API_LAME_GLOBAL_OPTS
+    s->reservoir = avctx->flags2 & CODEC_FLAG2_BIT_RESERVOIR;
+#endif
+    lame_set_disable_reservoir(s->gfp, !s->reservoir);
     if (lame_init_params(s->gfp) < 0)
         goto err_close;
 
@@ -212,17 +220,31 @@ static av_cold int MP3lame_encode_close(AVCodecContext *avctx)
     return 0;
 }
 
+#define OFFSET(x) offsetof(Mp3AudioContext, x)
+#define AE AV_OPT_FLAG_AUDIO_PARAM | AV_OPT_FLAG_ENCODING_PARAM
+static const AVOption options[] = {
+    { "reservoir",      "Use bit reservoir.",   OFFSET(reservoir),  AV_OPT_TYPE_INT, { 1 }, 0, 1, AE },
+    { NULL },
+};
 
-AVCodec libmp3lame_encoder = {
-    "libmp3lame",
-    AVMEDIA_TYPE_AUDIO,
-    CODEC_ID_MP3,
-    sizeof(Mp3AudioContext),
-    MP3lame_encode_init,
-    MP3lame_encode_frame,
-    MP3lame_encode_close,
+static const AVClass libmp3lame_class = {
+    .class_name = "libmp3lame encoder",
+    .item_name  = av_default_item_name,
+    .option     = options,
+    .version    = LIBAVUTIL_VERSION_INT,
+};
+
+AVCodec ff_libmp3lame_encoder = {
+    .name           = "libmp3lame",
+    .type           = AVMEDIA_TYPE_AUDIO,
+    .id             = CODEC_ID_MP3,
+    .priv_data_size = sizeof(Mp3AudioContext),
+    .init           = MP3lame_encode_init,
+    .encode         = MP3lame_encode_frame,
+    .close          = MP3lame_encode_close,
     .capabilities= CODEC_CAP_DELAY,
     .sample_fmts = (const enum AVSampleFormat[]){AV_SAMPLE_FMT_S16,AV_SAMPLE_FMT_NONE},
     .supported_samplerates= sSampleRates,
     .long_name= NULL_IF_CONFIG_SMALL("libmp3lame MP3 (MPEG audio layer 3)"),
+    .priv_class     = &libmp3lame_class,
 };

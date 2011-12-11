@@ -2,20 +2,20 @@
  * IEC 61937 demuxer
  * Copyright (c) 2010 Anssi Hannula <anssi.hannula at iki.fi>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -57,7 +57,7 @@ static int spdif_get_offset_and_codec(AVFormatContext *s,
         break;
     case IEC61937_MPEG2_AAC:
         init_get_bits(&gbc, buf, AAC_ADTS_HEADER_SIZE * 8);
-        if (ff_aac_parse_header(&gbc, &aac_hdr)) {
+        if (avpriv_aac_parse_header(&gbc, &aac_hdr)) {
             if (s) /* be silent during a probe */
                 av_log(s, AV_LOG_ERROR, "Invalid AAC packet in IEC 61937\n");
             return AVERROR_INVALIDDATA;
@@ -163,20 +163,20 @@ static int spdif_read_header(AVFormatContext *s, AVFormatParameters *ap)
 
 static int spdif_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
-    ByteIOContext *pb = s->pb;
+    AVIOContext *pb = s->pb;
     enum IEC61937DataType data_type;
     enum CodecID codec_id;
     uint32_t state = 0;
     int pkt_size_bits, offset, ret;
 
     while (state != (AV_BSWAP16C(SYNCWORD1) << 16 | AV_BSWAP16C(SYNCWORD2))) {
-        state = (state << 8) | get_byte(pb);
-        if (url_feof(pb))
+        state = (state << 8) | avio_r8(pb);
+        if (pb->eof_reached)
             return AVERROR_EOF;
     }
 
-    data_type = get_le16(pb);
-    pkt_size_bits = get_le16(pb);
+    data_type = avio_rl16(pb);
+    pkt_size_bits = avio_rl16(pb);
 
     if (pkt_size_bits % 16)
         av_log_ask_for_sample(s, "Packet does not end to a 16-bit boundary.");
@@ -185,9 +185,9 @@ static int spdif_read_packet(AVFormatContext *s, AVPacket *pkt)
     if (ret)
         return ret;
 
-    pkt->pos = url_ftell(pb) - BURST_HEADER_SIZE;
+    pkt->pos = avio_tell(pb) - BURST_HEADER_SIZE;
 
-    if (get_buffer(pb, pkt->data, pkt->size) < pkt->size) {
+    if (avio_read(pb, pkt->data, pkt->size) < pkt->size) {
         av_free_packet(pkt);
         return AVERROR_EOF;
     }
@@ -201,11 +201,11 @@ static int spdif_read_packet(AVFormatContext *s, AVPacket *pkt)
     }
 
     /* skip over the padding to the beginning of the next frame */
-    url_fskip(pb, offset - pkt->size - BURST_HEADER_SIZE);
+    avio_skip(pb, offset - pkt->size - BURST_HEADER_SIZE);
 
     if (!s->nb_streams) {
         /* first packet, create a stream */
-        AVStream *st = av_new_stream(s, 0);
+        AVStream *st = avformat_new_stream(s, NULL);
         if (!st) {
             av_free_packet(pkt);
             return AVERROR(ENOMEM);
@@ -225,12 +225,11 @@ static int spdif_read_packet(AVFormatContext *s, AVPacket *pkt)
     return 0;
 }
 
-AVInputFormat spdif_demuxer = {
-    "spdif",
-    NULL_IF_CONFIG_SMALL("IEC 61937 (compressed data in S/PDIF)"),
-    0,
-    spdif_probe,
-    spdif_read_header,
-    spdif_read_packet,
+AVInputFormat ff_spdif_demuxer = {
+    .name           = "spdif",
+    .long_name      = NULL_IF_CONFIG_SMALL("IEC 61937 (compressed data in S/PDIF)"),
+    .read_probe     = spdif_probe,
+    .read_header    = spdif_read_header,
+    .read_packet    = spdif_read_packet,
     .flags = AVFMT_GENERIC_INDEX,
 };

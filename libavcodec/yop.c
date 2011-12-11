@@ -1,30 +1,29 @@
-/**
- * @file
+/*
  * Psygnosis YOP decoder
  *
  * Copyright (C) 2010 Mohamed Naufal Basheer <naufal11@gmail.com>
  * derived from the code by
  * Copyright (C) 2009 Thomas P. Higdon <thomas.p.higdon@gmail.com>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include "libavutil/intreadwrite.h"
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 
 #include "avcodec.h"
 #include "get_bits.h"
@@ -248,14 +247,13 @@ static int yop_decode_frame(AVCodecContext *avctx, void *data, int *data_size,
     return avpkt->size;
 }
 
-AVCodec yop_decoder = {
-    "yop",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_YOP,
-    sizeof(YopDecContext),
-    yop_decode_init,
-    NULL,
-    yop_decode_close,
-    yop_decode_frame,
+AVCodec ff_yop_decoder = {
+    .name           = "yop",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_YOP,
+    .priv_data_size = sizeof(YopDecContext),
+    .init           = yop_decode_init,
+    .close          = yop_decode_close,
+    .decode         = yop_decode_frame,
     .long_name = NULL_IF_CONFIG_SMALL("Psygnosis YOP Video"),
 };

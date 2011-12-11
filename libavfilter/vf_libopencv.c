@@ -1,20 +1,20 @@
 /*
  * Copyright (c) 2010 Stefano Sabatini
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -26,7 +26,7 @@
 /* #define DEBUG */
 
 #include <opencv/cv.h>
-#include <opencv/cxtypes.h>
+#include <opencv/cxcore.h>
 #include "libavutil/avstring.h"
 #include "libavutil/file.h"
 #include "avfilter.h"
@@ -158,7 +158,7 @@ static int read_shape_from_file(int *cols, int *rows, int **values, const char *
         }
         w++;
     }
-    if (*rows > (FF_INTERNAL_MEM_TYPE_MAX_VALUE / (sizeof(int)) / *cols)) {
+    if (*rows > (SIZE_MAX / sizeof(int) / *cols)) {
         av_log(log_ctx, AV_LOG_ERROR, "File with size %dx%d is too big\n",
                *rows, *cols);
         return AVERROR_INVALIDDATA;

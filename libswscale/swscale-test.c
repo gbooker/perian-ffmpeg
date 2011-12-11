@@ -1,20 +1,20 @@
 /*
  * Copyright (C) 2003 Michael Niedermayer <michaelni@gmx.at>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -25,7 +25,7 @@
 #include <stdarg.h>
 
 #undef HAVE_AV_CONFIG_H
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 #include "libavutil/mem.h"
 #include "libavutil/avutil.h"
 #include "libavutil/crc.h"
@@ -58,15 +58,11 @@ static uint64_t getSSD(uint8_t *src1, uint8_t *src2, int stride1, int stride2, i
     int x,y;
     uint64_t ssd=0;
 
-//printf("%d %d\n", w, h);
-
     for (y=0; y<h; y++) {
         for (x=0; x<w; x++) {
             int d= src1[x + y*stride1] - src2[x + y*stride2];
             ssd+= d*d;
-//printf("%d", abs(src1[x + y*stride1] - src2[x + y*stride2])/26 );
         }
-//printf("\n");
     }
     return ssd;
 }
@@ -104,8 +100,7 @@ static int doTest(uint8_t *ref[4], int refStride[4], int w, int h,
         int p;
 
         for (p = 0; p < 4; p++)
-            if (src[p])
-                av_freep(&src[p]);
+            av_freep(&src[p]);
 
         av_image_fill_linesizes(srcStride, srcFormat, srcW);
         for (p = 0; p < 4; p++) {
@@ -163,8 +158,6 @@ static int doTest(uint8_t *ref[4], int refStride[4], int w, int h,
 
         goto end;
     }
-//    printf("test %X %X %X -> %X %X %X\n", (int)ref[0], (int)ref[1], (int)ref[2],
-//        (int)src[0], (int)src[1], (int)src[2]);
 
     printf(" %s %dx%d -> %s %3dx%3d flags=%2d",
            av_pix_fmt_descriptors[srcFormat].name, srcW, srcH,

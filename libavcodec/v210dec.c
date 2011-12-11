@@ -4,20 +4,20 @@
  * Copyright (C) 2009 Michael Niedermayer <michaelni@gmx.at>
  * Copyright (c) 2009 Baptiste Coudurier <baptiste dot coudurier at gmail dot com>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -30,7 +30,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
         av_log(avctx, AV_LOG_ERROR, "v210 needs even width\n");
         return -1;
     }
-    avctx->pix_fmt             = PIX_FMT_YUV422P16;
+    avctx->pix_fmt             = PIX_FMT_YUV422P10;
     avctx->bits_per_raw_sample = 10;
 
     avctx->coded_frame         = avcodec_alloc_frame();
@@ -63,15 +63,15 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
     y = (uint16_t*)pic->data[0];
     u = (uint16_t*)pic->data[1];
     v = (uint16_t*)pic->data[2];
-    pic->pict_type = FF_I_TYPE;
+    pic->pict_type = AV_PICTURE_TYPE_I;
     pic->key_frame = 1;
 
 #define READ_PIXELS(a, b, c)         \
     do {                             \
-        val  = av_le2ne32(*src++);     \
-        *a++ =  val <<  6;           \
-        *b++ = (val >>  4) & 0xFFC0; \
-        *c++ = (val >> 14) & 0xFFC0; \
+        val  = av_le2ne32(*src++);   \
+        *a++ =  val & 0x3FF;         \
+        *b++ = (val >> 10) & 0x3FF;  \
+        *c++ = (val >> 20) & 0x3FF;  \
     } while (0)
 
     for (h = 0; h < avctx->height; h++) {
@@ -87,15 +87,15 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
             READ_PIXELS(u, y, v);
 
             val  = av_le2ne32(*src++);
-            *y++ =  val <<  6;
+            *y++ =  val & 0x3FF;
         }
         if (w < avctx->width - 3) {
-            *u++ = (val >>  4) & 0xFFC0;
-            *y++ = (val >> 14) & 0xFFC0;
+            *u++ = (val >> 10) & 0x3FF;
+            *y++ = (val >> 20) & 0x3FF;
 
             val  = av_le2ne32(*src++);
-            *v++ =  val <<  6;
-            *y++ = (val >>  4) & 0xFFC0;
+            *v++ =  val & 0x3FF;
+            *y++ = (val >> 10) & 0x3FF;
         }
 
         psrc += stride;
@@ -120,15 +120,13 @@ static av_cold int decode_close(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec v210_decoder = {
-    "v210",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_V210,
-    0,
-    decode_init,
-    NULL,
-    decode_close,
-    decode_frame,
-    CODEC_CAP_DR1,
+AVCodec ff_v210_decoder = {
+    .name           = "v210",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_V210,
+    .init           = decode_init,
+    .close          = decode_close,
+    .decode         = decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("Uncompressed 4:2:2 10-bit"),
 };

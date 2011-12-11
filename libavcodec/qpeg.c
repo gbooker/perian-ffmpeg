@@ -2,20 +2,20 @@
  * QPEG codec
  * Copyright (c) 2004 Konstantin Shishkov
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -30,6 +30,7 @@ typedef struct QpegContext{
     AVCodecContext *avctx;
     AVFrame pic;
     uint8_t *refdata;
+    uint32_t pal[256];
 } QpegContext;
 
 static void qpeg_decode_intra(const uint8_t *src, uint8_t *dst, int size,
@@ -256,13 +257,11 @@ static int decode_frame(AVCodecContext *avctx,
     AVFrame * const p= (AVFrame*)&a->pic;
     uint8_t* outdata;
     int delta;
+    const uint8_t *pal = av_packet_get_side_data(avpkt, AV_PKT_DATA_PALETTE, NULL);
 
-    if(p->data[0])
-        avctx->release_buffer(avctx, p);
-
-    p->reference= 0;
-    if(avctx->get_buffer(avctx, p) < 0){
-        av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
+    p->reference = 3;
+    if (avctx->reget_buffer(avctx, p) < 0) {
+        av_log(avctx, AV_LOG_ERROR, "reget_buffer() failed\n");
         return -1;
     }
     outdata = a->pic.data[0];
@@ -274,11 +273,11 @@ static int decode_frame(AVCodecContext *avctx,
     }
 
     /* make the palette available on the way out */
-    memcpy(a->pic.data[1], a->avctx->palctrl->palette, AVPALETTE_SIZE);
-    if (a->avctx->palctrl->palette_changed) {
+    if (pal) {
         a->pic.palette_has_changed = 1;
-        a->avctx->palctrl->palette_changed = 0;
+        memcpy(a->pal, pal, AVPALETTE_SIZE);
     }
+    memcpy(a->pic.data[1], a->pal, AVPALETTE_SIZE);
 
     *data_size = sizeof(AVFrame);
     *(AVFrame*)data = a->pic;
@@ -289,10 +288,6 @@ static int decode_frame(AVCodecContext *avctx,
 static av_cold int decode_init(AVCodecContext *avctx){
     QpegContext * const a = avctx->priv_data;
 
-    if (!avctx->palctrl) {
-        av_log(avctx, AV_LOG_FATAL, "Missing required palette via palctrl\n");
-        return -1;
-    }
     a->avctx = avctx;
     avctx->pix_fmt= PIX_FMT_PAL8;
     a->refdata = av_malloc(avctx->width * avctx->height);
@@ -311,15 +306,14 @@ static av_cold int decode_end(AVCodecContext *avctx){
     return 0;
 }
 
-AVCodec qpeg_decoder = {
-    "qpeg",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_QPEG,
-    sizeof(QpegContext),
-    decode_init,
-    NULL,
-    decode_end,
-    decode_frame,
-    CODEC_CAP_DR1,
+AVCodec ff_qpeg_decoder = {
+    .name           = "qpeg",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_QPEG,
+    .priv_data_size = sizeof(QpegContext),
+    .init           = decode_init,
+    .close          = decode_end,
+    .decode         = decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("Q-team QPEG"),
 };

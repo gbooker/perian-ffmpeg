@@ -3,20 +3,20 @@
  *
  * Copyright (c) 2008 Vladimir Voroshilov
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -48,26 +48,6 @@ const uint8_t ff_fc_2pulses_9bits_track1_gray[16] =
   28, 26,
 };
 
-const uint8_t ff_fc_2pulses_9bits_track2_gray[32] =
-{
-  0,  2,
-  5,  4,
-  12, 10,
-  7,  9,
-  25, 24,
-  20, 22,
-  14, 15,
-  19, 17,
-  36, 31,
-  21, 26,
-  1,  6,
-  16, 11,
-  27, 29,
-  32, 30,
-  39, 37,
-  34, 35,
-};
-
 const uint8_t ff_fc_4pulses_8bits_tracks_13[16] =
 {
   0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75,
@@ -92,16 +72,6 @@ const uint8_t ff_fc_4pulses_8bits_track_4[32] =
     73, 74,
     78, 79,
 };
-
-#if 0
-static uint8_t gray_decode[32] =
-{
-    0,  1,  3,  2,  7,  6,  4,  5,
-   15, 14, 12, 13,  8,  9, 11, 10,
-   31, 30, 28, 29, 24, 25, 27, 26,
-   16, 17, 19, 18, 23, 22, 20, 21
-};
-#endif
 
 const float ff_pow_0_7[10] = {
     0.700000, 0.490000, 0.343000, 0.240100, 0.168070,

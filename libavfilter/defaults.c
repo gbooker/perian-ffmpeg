@@ -2,26 +2,26 @@
  * Filter layer - default implementations
  * Copyright (c) 2007 Bobby Bingham
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libavcore/audioconvert.h"
-#include "libavcore/imgutils.h"
-#include "libavcore/samplefmt.h"
+#include "libavutil/audioconvert.h"
+#include "libavutil/imgutils.h"
+#include "libavutil/samplefmt.h"
 #include "avfilter.h"
 #include "internal.h"
 
@@ -57,7 +57,7 @@ AVFilterBufferRef *avfilter_default_get_video_buffer(AVFilterLink *link, int per
 
 AVFilterBufferRef *avfilter_default_get_audio_buffer(AVFilterLink *link, int perms,
                                                      enum AVSampleFormat sample_fmt, int size,
-                                                     int64_t channel_layout, int planar)
+                                                     uint64_t channel_layout, int planar)
 {
     AVFilterBuffer *samples = av_mallocz(sizeof(AVFilterBuffer));
     AVFilterBufferRef *ref = NULL;
@@ -84,7 +84,7 @@ AVFilterBufferRef *avfilter_default_get_audio_buffer(AVFilterLink *link, int per
     samples->refcount   = 1;
     samples->free       = ff_avfilter_default_free_buffer;
 
-    sample_size = av_get_bits_per_sample_fmt(sample_fmt) >>3;
+    sample_size = av_get_bytes_per_sample(sample_fmt);
     chans_nb = av_get_channel_layout_nb_channels(channel_layout);
 
     per_channel_size = size/chans_nb;
@@ -126,7 +126,7 @@ AVFilterBufferRef *avfilter_default_get_audio_buffer(AVFilterLink *link, int per
     return ref;
 
 fail:
-    if (ref && ref->audio)
+    if (ref)
         av_free(ref->audio);
     av_free(ref);
     av_free(samples);
@@ -292,7 +292,7 @@ AVFilterBufferRef *avfilter_null_get_video_buffer(AVFilterLink *link, int perms,
 
 AVFilterBufferRef *avfilter_null_get_audio_buffer(AVFilterLink *link, int perms,
                                                   enum AVSampleFormat sample_fmt, int size,
-                                                  int64_t channel_layout, int packed)
+                                                  uint64_t channel_layout, int packed)
 {
     return avfilter_get_audio_buffer(link->dst->outputs[0], perms, sample_fmt,
                                      size, channel_layout, packed);

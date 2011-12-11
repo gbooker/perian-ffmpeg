@@ -1,20 +1,20 @@
 /*
  * Copyright (C) 2008 Michael Niedermayer
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -25,16 +25,14 @@ static int parse(AVCodecParserContext *s,
                            const uint8_t **poutbuf, int *poutbuf_size,
                            const uint8_t *buf, int buf_size)
 {
-    s->pict_type= (buf[0]&0x01) ? FF_P_TYPE : FF_I_TYPE;
+    s->pict_type= (buf[0]&0x01) ? AV_PICTURE_TYPE_P : AV_PICTURE_TYPE_I;
 
     *poutbuf = buf;
     *poutbuf_size = buf_size;
     return buf_size;
 }
 
-AVCodecParser vp8_parser = {
-    { CODEC_ID_VP8 },
-    0,
-    NULL,
-    parse,
+AVCodecParser ff_vp8_parser = {
+    .codec_ids      = { CODEC_ID_VP8 },
+    .parser_parse   = parse,
 };

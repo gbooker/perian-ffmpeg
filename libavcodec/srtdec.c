@@ -2,25 +2,25 @@
  * SubRip subtitle decoder
  * Copyright (c) 2010  Aurelien Jacobs <aurel@gnuage.org>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include "libavutil/avstring.h"
-#include "libavcore/parseutils.h"
+#include "libavutil/parseutils.h"
 #include "avcodec.h"
 #include "ass.h"
 
@@ -94,7 +94,7 @@ static const char *srt_to_ass(AVCodecContext *avctx, char *out, char *out_end,
             break;
         case '<':
             tag_close = in[1] == '/';
-            if (sscanf(in+tag_close+1, "%128[^>]>%n%c", buffer, &len,&c) >= 2) {
+            if (sscanf(in+tag_close+1, "%127[^>]>%n%c", buffer, &len,&c) >= 2) {
                 if ((param = strchr(buffer, ' ')))
                     *param++ = 0;
                 if ((!tag_close && sptr < FF_ARRAY_ELEMS(stack)) ||
@@ -231,7 +231,7 @@ static int srt_decode_frame(AVCodecContext *avctx,
     return avpkt->size;
 }
 
-AVCodec srt_decoder = {
+AVCodec ff_srt_decoder = {
     .name         = "srt",
     .long_name    = NULL_IF_CONFIG_SMALL("SubRip subtitle"),
     .type         = AVMEDIA_TYPE_SUBTITLE,

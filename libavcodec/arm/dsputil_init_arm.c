@@ -2,20 +2,20 @@
  * ARM optimized DSP utils
  * Copyright (c) 2001 Lionel Ulmer
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -75,10 +75,12 @@ static void simple_idct_arm_add(uint8_t *dest, int line_size, DCTELEM *block)
 
 void dsputil_init_arm(DSPContext* c, AVCodecContext *avctx)
 {
+    const int high_bit_depth = avctx->bits_per_raw_sample > 8;
+
     ff_put_pixels_clamped = c->put_pixels_clamped;
     ff_add_pixels_clamped = c->add_pixels_clamped;
 
-    if (!avctx->lowres) {
+    if (!avctx->lowres && avctx->bits_per_raw_sample <= 8) {
         if(avctx->idct_algo == FF_IDCT_AUTO ||
            avctx->idct_algo == FF_IDCT_ARM){
             c->idct_put              = j_rev_dct_arm_put;
@@ -95,6 +97,7 @@ void dsputil_init_arm(DSPContext* c, AVCodecContext *avctx)
 
     c->add_pixels_clamped = ff_add_pixels_clamped_arm;
 
+    if (!high_bit_depth) {
     c->put_pixels_tab[0][0] = ff_put_pixels16_arm;
     c->put_pixels_tab[0][1] = ff_put_pixels16_x2_arm;
     c->put_pixels_tab[0][2] = ff_put_pixels16_y2_arm;
@@ -112,6 +115,7 @@ void dsputil_init_arm(DSPContext* c, AVCodecContext *avctx)
     c->put_no_rnd_pixels_tab[1][1] = ff_put_no_rnd_pixels8_x2_arm;
     c->put_no_rnd_pixels_tab[1][2] = ff_put_no_rnd_pixels8_y2_arm;
     c->put_no_rnd_pixels_tab[1][3] = ff_put_no_rnd_pixels8_xy2_arm;
+    }
 
     if (HAVE_ARMV5TE) ff_dsputil_init_armv5te(c, avctx);
     if (HAVE_ARMV6)   ff_dsputil_init_armv6(c, avctx);

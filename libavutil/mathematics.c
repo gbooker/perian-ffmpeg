@@ -1,20 +1,20 @@
 /*
  * Copyright (c) 2005 Michael Niedermayer <michaelni@gmx.at>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -150,32 +150,3 @@ int64_t av_compare_mod(uint64_t a, uint64_t b, uint64_t mod){
         c-= mod;
     return c;
 }
-
-#ifdef TEST
-#include "integer.h"
-#undef printf
-int main(void){
-    int64_t a,b,c,d,e;
-
-    for(a=7; a<(1LL<<62); a+=a/3+1){
-        for(b=3; b<(1LL<<62); b+=b/4+1){
-            for(c=9; c<(1LL<<62); c+=(c*2)/5+3){
-                int64_t r= c/2;
-                AVInteger ai;
-                ai= av_mul_i(av_int2i(a), av_int2i(b));
-                ai= av_add_i(ai, av_int2i(r));
-
-                d= av_i2int(av_div_i(ai, av_int2i(c)));
-
-                e= av_rescale(a,b,c);
-
-                if((double)a * (double)b / (double)c > (1LL<<63))
-                    continue;
-
-                if(d!=e) printf("%"PRId64"*%"PRId64"/%"PRId64"= %"PRId64"=%"PRId64"\n", a, b, c, d, e);
-            }
-        }
-    }
-    return 0;
-}
-#endif

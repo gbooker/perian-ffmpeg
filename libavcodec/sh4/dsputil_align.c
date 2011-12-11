@@ -3,20 +3,20 @@
  *
  * Copyright (c) 2001-2003 BERO <bero@geocities.co.jp>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -333,6 +333,9 @@ DEFFUNC(avg,no_rnd,xy,16,OP_XY,PACK)
 
 void dsputil_init_align(DSPContext* c, AVCodecContext *avctx)
 {
+        const int high_bit_depth = avctx->bits_per_raw_sample > 8;
+
+        if (!high_bit_depth) {
         c->put_pixels_tab[0][0] = put_rnd_pixels16_o;
         c->put_pixels_tab[0][1] = put_rnd_pixels16_x;
         c->put_pixels_tab[0][2] = put_rnd_pixels16_y;
@@ -368,6 +371,7 @@ void dsputil_init_align(DSPContext* c, AVCodecContext *avctx)
         c->avg_no_rnd_pixels_tab[1][1] = avg_no_rnd_pixels8_x;
         c->avg_no_rnd_pixels_tab[1][2] = avg_no_rnd_pixels8_y;
         c->avg_no_rnd_pixels_tab[1][3] = avg_no_rnd_pixels8_xy;
+        }
 
 #ifdef QPEL
 
@@ -401,20 +405,24 @@ void dsputil_init_align(DSPContext* c, AVCodecContext *avctx)
     dspfunc(avg_qpel, 1, 8);
     /* dspfunc(avg_no_rnd_qpel, 1, 8); */
 
+    if (!high_bit_depth) {
     dspfunc(put_h264_qpel, 0, 16);
     dspfunc(put_h264_qpel, 1, 8);
     dspfunc(put_h264_qpel, 2, 4);
     dspfunc(avg_h264_qpel, 0, 16);
     dspfunc(avg_h264_qpel, 1, 8);
     dspfunc(avg_h264_qpel, 2, 4);
+    }
 
 #undef dspfunc
+    if (!high_bit_depth) {
     c->put_h264_chroma_pixels_tab[0]= put_h264_chroma_mc8_sh4;
     c->put_h264_chroma_pixels_tab[1]= put_h264_chroma_mc4_sh4;
     c->put_h264_chroma_pixels_tab[2]= put_h264_chroma_mc2_sh4;
     c->avg_h264_chroma_pixels_tab[0]= avg_h264_chroma_mc8_sh4;
     c->avg_h264_chroma_pixels_tab[1]= avg_h264_chroma_mc4_sh4;
     c->avg_h264_chroma_pixels_tab[2]= avg_h264_chroma_mc2_sh4;
+    }
 
     c->put_mspel_pixels_tab[0]= put_mspel8_mc00_sh4;
     c->put_mspel_pixels_tab[1]= put_mspel8_mc10_sh4;

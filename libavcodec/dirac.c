@@ -2,20 +2,20 @@
  * Copyright (C) 2007 Marco Gerards <marco@gnu.org>
  * Copyright (C) 2009 David Conrad
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -25,7 +25,7 @@
  * @author Marco Gerards <marco@gnu.org>
  */
 
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 #include "dirac.h"
 #include "avcodec.h"
 #include "golomb.h"
@@ -145,7 +145,7 @@ static int parse_source_parameters(AVCodecContext *avctx, GetBitContext *gb,
     }
     if (source->frame_rate_index > 0) {
         if (source->frame_rate_index <= 8)
-            frame_rate = ff_frame_rate_tab[source->frame_rate_index];
+            frame_rate = avpriv_frame_rate_tab[source->frame_rate_index];
         else
             frame_rate = dirac_frame_rate[source->frame_rate_index-9];
     }
@@ -242,14 +242,14 @@ static int parse_source_parameters(AVCodecContext *avctx, GetBitContext *gb,
     return 0;
 }
 
-int ff_dirac_parse_sequence_header(AVCodecContext *avctx, GetBitContext *gb,
+int avpriv_dirac_parse_sequence_header(AVCodecContext *avctx, GetBitContext *gb,
                                    dirac_source_params *source)
 {
-    unsigned version_major, version_minor;
+    unsigned version_major;
     unsigned video_format, picture_coding_mode;
 
     version_major  = svq3_get_ue_golomb(gb);
-    version_minor  = svq3_get_ue_golomb(gb);
+    svq3_get_ue_golomb(gb); /* version_minor */
     avctx->profile = svq3_get_ue_golomb(gb);
     avctx->level   = svq3_get_ue_golomb(gb);
     video_format   = svq3_get_ue_golomb(gb);

@@ -2,20 +2,20 @@
  * MLP parser
  * Copyright (c) 2007 Ian Caulfield
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -27,6 +27,7 @@
 #include <stdint.h>
 
 #include "libavutil/crc.h"
+#include "libavutil/audioconvert.h"
 #include "get_bits.h"
 #include "parser.h"
 #include "mlp_parser.h"
@@ -42,9 +43,50 @@ static const uint8_t mlp_channels[32] = {
     5, 6, 5, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+static const uint64_t mlp_layout[32] = {
+    AV_CH_LAYOUT_MONO,
+    AV_CH_LAYOUT_STEREO,
+    AV_CH_LAYOUT_2_1,
+    AV_CH_LAYOUT_2_2,
+    AV_CH_LAYOUT_STEREO|AV_CH_LOW_FREQUENCY,
+    AV_CH_LAYOUT_2_1|AV_CH_LOW_FREQUENCY,
+    AV_CH_LAYOUT_2_2|AV_CH_LOW_FREQUENCY,
+    AV_CH_LAYOUT_SURROUND,
+    AV_CH_LAYOUT_4POINT0,
+    AV_CH_LAYOUT_5POINT0,
+    AV_CH_LAYOUT_SURROUND|AV_CH_LOW_FREQUENCY,
+    AV_CH_LAYOUT_4POINT0|AV_CH_LOW_FREQUENCY,
+    AV_CH_LAYOUT_5POINT1,
+    AV_CH_LAYOUT_4POINT0,
+    AV_CH_LAYOUT_5POINT0,
+    AV_CH_LAYOUT_SURROUND|AV_CH_LOW_FREQUENCY,
+    AV_CH_LAYOUT_4POINT0|AV_CH_LOW_FREQUENCY,
+    AV_CH_LAYOUT_5POINT1,
+    AV_CH_LAYOUT_2_2|AV_CH_LOW_FREQUENCY,
+    AV_CH_LAYOUT_5POINT0,
+    AV_CH_LAYOUT_5POINT1,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
 static const uint8_t thd_chancount[13] = {
 //  LR    C   LFE  LRs LRvh  LRc LRrs  Cs   Ts  LRsd  LRw  Cvh  LFE2
      2,   1,   1,   2,   2,   2,   2,   1,   1,   2,   2,   1,   1
+};
+
+static const uint64_t thd_layout[13] = {
+    AV_CH_FRONT_LEFT|AV_CH_FRONT_RIGHT,                     // LR
+    AV_CH_FRONT_CENTER,                                     // C
+    AV_CH_LOW_FREQUENCY,                                    // LFE
+    AV_CH_SIDE_LEFT|AV_CH_SIDE_RIGHT,                       // LRs
+    AV_CH_TOP_FRONT_LEFT|AV_CH_TOP_FRONT_RIGHT,             // LRvh
+    AV_CH_SIDE_LEFT|AV_CH_SIDE_RIGHT,                       // LRc
+    AV_CH_BACK_LEFT|AV_CH_BACK_RIGHT,                       // LRrs
+    AV_CH_BACK_CENTER,                                      // Cs
+    AV_CH_TOP_BACK_CENTER,                                  // Ts
+    AV_CH_SIDE_LEFT|AV_CH_SIDE_RIGHT,                       // LRsd
+    AV_CH_FRONT_LEFT_OF_CENTER|AV_CH_FRONT_RIGHT_OF_CENTER, // LRw
+    AV_CH_TOP_BACK_CENTER,                                  // Cvh
+    AV_CH_LOW_FREQUENCY                                     // LFE2
 };
 
 static int mlp_samplerate(int in)
@@ -63,6 +105,16 @@ static int truehd_channels(int chanmap)
         channels += thd_chancount[i] * ((chanmap >> i) & 1);
 
     return channels;
+}
+
+static uint64_t truehd_layout(int chanmap)
+{
+    int layout = 0, i;
+
+    for (i = 0; i < 13; i++)
+        layout |= thd_layout[i] * ((chanmap >> i) & 1);
+
+    return layout;
 }
 
 /** Read a major sync info header - contains high level information about
@@ -86,11 +138,11 @@ int ff_mlp_read_major_sync(void *log, MLPHeaderInfo *mh, GetBitContext *gb)
     checksum = ff_mlp_checksum16(gb->buffer, 26);
     if (checksum != AV_RL16(gb->buffer+26)) {
         av_log(log, AV_LOG_ERROR, "major sync info header checksum error\n");
-        return -1;
+        return AVERROR_INVALIDDATA;
     }
 
     if (get_bits_long(gb, 24) != 0xf8726f) /* Sync words */
-        return -1;
+        return AVERROR_INVALIDDATA;
 
     mh->stream_type = get_bits(gb, 8);
 
@@ -121,7 +173,7 @@ int ff_mlp_read_major_sync(void *log, MLPHeaderInfo *mh, GetBitContext *gb)
 
         mh->channels_thd_stream2 = get_bits(gb, 13);
     } else
-        return -1;
+        return AVERROR_INVALIDDATA;
 
     mh->access_unit_size = 40 << (ratebits & 7);
     mh->access_unit_size_pow2 = 64 << (ratebits & 7);
@@ -264,12 +316,16 @@ static int mlp_parse(AVCodecParserContext *s,
         if (mh.stream_type == 0xbb) {
             /* MLP stream */
             avctx->channels = mlp_channels[mh.channels_mlp];
+            avctx->channel_layout = mlp_layout[mh.channels_mlp];
         } else { /* mh.stream_type == 0xba */
             /* TrueHD stream */
-            if (mh.channels_thd_stream2)
+            if (mh.channels_thd_stream2) {
                 avctx->channels = truehd_channels(mh.channels_thd_stream2);
-            else
+                avctx->channel_layout = truehd_layout(mh.channels_thd_stream2);
+            } else {
                 avctx->channels = truehd_channels(mh.channels_thd_stream1);
+                avctx->channel_layout = truehd_layout(mh.channels_thd_stream1);
+            }
         }
 
         if (!mh.is_vbr) /* Stream is CBR */
@@ -288,10 +344,10 @@ lost_sync:
     return 1;
 }
 
-AVCodecParser mlp_parser = {
-    { CODEC_ID_MLP, CODEC_ID_TRUEHD },
-    sizeof(MLPParseContext),
-    mlp_init,
-    mlp_parse,
-    ff_parse_close,
+AVCodecParser ff_mlp_parser = {
+    .codec_ids      = { CODEC_ID_MLP, CODEC_ID_TRUEHD },
+    .priv_data_size = sizeof(MLPParseContext),
+    .parser_init    = mlp_init,
+    .parser_parse   = mlp_parse,
+    .parser_close   = ff_parse_close,
 };

@@ -3,24 +3,24 @@
  * Copyright (c) 2006, 2007 Michel Bardiaux
  * Copyright (c) 2009 Daniel Verkamp <daniel at drv.nu>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libavcore/internal.h"
+#include "libavutil/imgutils.h"
 #include "avcodec.h"
 #include "bytestream.h"
 #include "bmp.h"
@@ -74,7 +74,7 @@ static int bmp_encode_frame(AVCodecContext *avctx, unsigned char *buf, int buf_s
     uint8_t *ptr;
     unsigned char* buf0 = buf;
     *p = *pict;
-    p->pict_type= FF_I_TYPE;
+    p->pict_type= AV_PICTURE_TYPE_I;
     p->key_frame= 1;
     switch (avctx->pix_fmt) {
     case PIX_FMT_RGB565:
@@ -149,14 +149,13 @@ static int bmp_encode_frame(AVCodecContext *avctx, unsigned char *buf, int buf_s
     return n_bytes;
 }
 
-AVCodec bmp_encoder = {
-    "bmp",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_BMP,
-    sizeof(BMPContext),
-    bmp_encode_init,
-    bmp_encode_frame,
-    NULL, //encode_end,
+AVCodec ff_bmp_encoder = {
+    .name           = "bmp",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_BMP,
+    .priv_data_size = sizeof(BMPContext),
+    .init           = bmp_encode_init,
+    .encode         = bmp_encode_frame,
     .pix_fmts = (const enum PixelFormat[]){
         PIX_FMT_BGR24,
         PIX_FMT_RGB555, PIX_FMT_RGB565,

@@ -2,20 +2,20 @@
  * Deluxe Paint Animation decoder
  * Copyright (c) 2009 Peter Ross
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -81,6 +81,8 @@ static inline int op(uint8_t **dst, const uint8_t *dst_end,
         int striplen = FFMIN(count, remaining);
         if (buf) {
             striplen = FFMIN(striplen, buf_end - *buf);
+            if (*buf >= buf_end)
+                goto exhausted;
             memcpy(*dst, *buf, striplen);
             *buf += striplen;
         } else if (pixel >= 0)
@@ -183,15 +185,14 @@ static av_cold int decode_end(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec anm_decoder = {
-    "anm",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_ANM,
-    sizeof(AnmContext),
-    decode_init,
-    NULL,
-    decode_end,
-    decode_frame,
-    CODEC_CAP_DR1,
+AVCodec ff_anm_decoder = {
+    .name           = "anm",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_ANM,
+    .priv_data_size = sizeof(AnmContext),
+    .init           = decode_init,
+    .close          = decode_end,
+    .decode         = decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("Deluxe Paint Animation"),
 };

@@ -2,28 +2,32 @@
  * TIFF image encoder
  * Copyright (c) 2007 Bartlomiej Wolowiec
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 /**
- * TIFF image encoder
  * @file
+ * TIFF image encoder
  * @author Bartlomiej Wolowiec
  */
+
+#include "libavutil/log.h"
+#include "libavutil/opt.h"
+
 #include "avcodec.h"
 #if CONFIG_ZLIB
 #include <zlib.h>
@@ -42,6 +46,7 @@ static const uint8_t type_sizes2[6] = {
 };
 
 typedef struct TiffEncoderContext {
+    AVClass *class;                     ///< for private options
     AVCodecContext *avctx;
     AVFrame picture;
 
@@ -216,16 +221,21 @@ static int encode_frame(AVCodecContext * avctx, unsigned char *buf,
     uint8_t *yuv_line = NULL;
     int shift_h, shift_v;
 
+    s->avctx = avctx;
     s->buf_start = buf;
     s->buf = &ptr;
     s->buf_size = buf_size;
 
     *p = *pict;
-    p->pict_type = FF_I_TYPE;
+    p->pict_type = AV_PICTURE_TYPE_I;
     p->key_frame = 1;
     avctx->coded_frame= &s->picture;
 
-    s->compr = TIFF_PACKBITS;
+#if FF_API_TIFFENC_COMPLEVEL
+    if (avctx->compression_level != FF_COMPRESSION_DEFAULT)
+        av_log(avctx, AV_LOG_WARNING, "Using compression_level to set compression "
+               "algorithm is deprecated. Please use the compression_algo private "
+               "option instead.\n");
     if (avctx->compression_level == 0) {
         s->compr = TIFF_RAW;
     } else if(avctx->compression_level == 2) {
@@ -235,6 +245,7 @@ static int encode_frame(AVCodecContext * avctx, unsigned char *buf,
         s->compr = TIFF_DEFLATE;
 #endif
     }
+#endif
 
     s->width = avctx->width;
     s->height = avctx->height;
@@ -442,17 +453,32 @@ fail:
     return ret;
 }
 
-AVCodec tiff_encoder = {
-    "tiff",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_TIFF,
-    sizeof(TiffEncoderContext),
-    NULL,
-    encode_frame,
-    NULL,
-    NULL,
-    0,
-    NULL,
+#define OFFSET(x) offsetof(TiffEncoderContext, x)
+#define VE AV_OPT_FLAG_VIDEO_PARAM | AV_OPT_FLAG_ENCODING_PARAM
+static const AVOption options[] = {
+    { "compression_algo", NULL, OFFSET(compr), AV_OPT_TYPE_INT, {TIFF_PACKBITS}, TIFF_RAW, TIFF_DEFLATE, VE, "compression_algo" },
+    { "packbits", NULL, 0, AV_OPT_TYPE_CONST, {TIFF_PACKBITS}, 0, 0, VE, "compression_algo" },
+    { "raw",      NULL, 0, AV_OPT_TYPE_CONST, {TIFF_RAW},      0, 0, VE, "compression_algo" },
+    { "lzw",      NULL, 0, AV_OPT_TYPE_CONST, {TIFF_LZW},      0, 0, VE, "compression_algo" },
+#if CONFIG_ZLIB
+    { "deflate",  NULL, 0, AV_OPT_TYPE_CONST, {TIFF_DEFLATE},  0, 0, VE, "compression_algo" },
+#endif
+    { NULL },
+};
+
+static const AVClass tiffenc_class = {
+    .class_name = "TIFF encoder",
+    .item_name  = av_default_item_name,
+    .option     = options,
+    .version    = LIBAVUTIL_VERSION_INT,
+};
+
+AVCodec ff_tiff_encoder = {
+    .name           = "tiff",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_TIFF,
+    .priv_data_size = sizeof(TiffEncoderContext),
+    .encode         = encode_frame,
     .pix_fmts =
         (const enum PixelFormat[]) {PIX_FMT_RGB24, PIX_FMT_PAL8, PIX_FMT_GRAY8,
                               PIX_FMT_MONOBLACK, PIX_FMT_MONOWHITE,
@@ -461,4 +487,5 @@ AVCodec tiff_encoder = {
                               PIX_FMT_YUV411P,
                               PIX_FMT_NONE},
     .long_name = NULL_IF_CONFIG_SMALL("TIFF image"),
+    .priv_class     = &tiffenc_class,
 };

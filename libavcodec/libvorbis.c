@@ -1,20 +1,20 @@
 /*
  * copyright (c) 2002 Mark Hills <mark@pogo.org.uk>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -30,6 +30,7 @@
 #include "avcodec.h"
 #include "bytestream.h"
 #include "vorbis.h"
+#include "libavutil/mathematics.h"
 
 #undef NDEBUG
 #include <assert.h>
@@ -55,7 +56,7 @@ typedef struct OggVorbisContext {
 } OggVorbisContext ;
 
 static const AVOption options[]={
-{"iblock", "Sets the impulse block bias", offsetof(OggVorbisContext, iblock), FF_OPT_TYPE_DOUBLE, 0, -15, 0, AV_OPT_FLAG_AUDIO_PARAM|AV_OPT_FLAG_ENCODING_PARAM},
+{"iblock", "Sets the impulse block bias", offsetof(OggVorbisContext, iblock), AV_OPT_TYPE_DOUBLE, {.dbl = 0}, -15, 0, AV_OPT_FLAG_AUDIO_PARAM|AV_OPT_FLAG_ENCODING_PARAM},
 {NULL}
 };
 static const AVClass class = { "libvorbis", av_default_item_name, options, LIBAVUTIL_VERSION_INT };
@@ -243,16 +244,16 @@ static av_cold int oggvorbis_encode_close(AVCodecContext *avccontext) {
 }
 
 
-AVCodec libvorbis_encoder = {
-    "libvorbis",
-    AVMEDIA_TYPE_AUDIO,
-    CODEC_ID_VORBIS,
-    sizeof(OggVorbisContext),
-    oggvorbis_encode_init,
-    oggvorbis_encode_frame,
-    oggvorbis_encode_close,
-    .capabilities= CODEC_CAP_DELAY,
-    .sample_fmts = (const enum AVSampleFormat[]){AV_SAMPLE_FMT_S16,AV_SAMPLE_FMT_NONE},
-    .long_name= NULL_IF_CONFIG_SMALL("libvorbis Vorbis"),
-    .priv_class= &class,
-} ;
+AVCodec ff_libvorbis_encoder = {
+    .name           = "libvorbis",
+    .type           = AVMEDIA_TYPE_AUDIO,
+    .id             = CODEC_ID_VORBIS,
+    .priv_data_size = sizeof(OggVorbisContext),
+    .init           = oggvorbis_encode_init,
+    .encode         = oggvorbis_encode_frame,
+    .close          = oggvorbis_encode_close,
+    .capabilities   = CODEC_CAP_DELAY,
+    .sample_fmts    = (const enum AVSampleFormat[]){AV_SAMPLE_FMT_S16,AV_SAMPLE_FMT_NONE},
+    .long_name      = NULL_IF_CONFIG_SMALL("libvorbis Vorbis"),
+    .priv_class     = &class,
+};

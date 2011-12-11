@@ -2,27 +2,29 @@
  * MMX optimized LPC DSP utils
  * Copyright (c) 2007 Loren Merritt
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include "libavutil/x86_cpu.h"
-#include "dsputil_mmx.h"
+#include "libavutil/cpu.h"
+#include "libavcodec/lpc.h"
 
-static void apply_welch_window_sse2(const int32_t *data, int len, double *w_data)
+static void lpc_apply_welch_window_sse2(const int32_t *data, int len,
+                                        double *w_data)
 {
     double c = 2.0 / (len-1.0);
     int n2 = len>>1;
@@ -68,21 +70,13 @@ static void apply_welch_window_sse2(const int32_t *data, int len, double *w_data
 #undef WELCH
 }
 
-void ff_lpc_compute_autocorr_sse2(const int32_t *data, int len, int lag,
-                                   double *autoc)
+static void lpc_compute_autocorr_sse2(const double *data, int len, int lag,
+                                      double *autoc)
 {
-    double tmp[len + lag + 2];
-    double *data1 = tmp + lag;
     int j;
 
-    if((x86_reg)data1 & 15)
-        data1++;
-
-    apply_welch_window_sse2(data, len, data1);
-
-    for(j=0; j<lag; j++)
-        data1[j-lag]= 0.0;
-    data1[len] = 0.0;
+    if((x86_reg)data & 15)
+        data++;
 
     for(j=0; j<lag; j+=2){
         x86_reg i = -len*sizeof(double);
@@ -113,7 +107,7 @@ void ff_lpc_compute_autocorr_sse2(const int32_t *data, int len, int lag,
                 "movsd     %%xmm1,  8(%1)           \n\t"
                 "movsd     %%xmm2, 16(%1)           \n\t"
                 :"+&r"(i)
-                :"r"(autoc+j), "r"(data1+len), "r"(data1+len-j)
+                :"r"(autoc+j), "r"(data+len), "r"(data+len-j)
                 :"memory"
             );
         } else {
@@ -136,8 +130,18 @@ void ff_lpc_compute_autocorr_sse2(const int32_t *data, int len, int lag,
                 "movsd     %%xmm0, %1               \n\t"
                 "movsd     %%xmm1, %2               \n\t"
                 :"+&r"(i), "=m"(autoc[j]), "=m"(autoc[j+1])
-                :"r"(data1+len), "r"(data1+len-j)
+                :"r"(data+len), "r"(data+len-j)
             );
         }
+    }
+}
+
+av_cold void ff_lpc_init_x86(LPCContext *c)
+{
+    int mm_flags = av_get_cpu_flags();
+
+    if (mm_flags & (AV_CPU_FLAG_SSE2|AV_CPU_FLAG_SSE2SLOW)) {
+        c->lpc_apply_welch_window = lpc_apply_welch_window_sse2;
+        c->lpc_compute_autocorr   = lpc_compute_autocorr_sse2;
     }
 }

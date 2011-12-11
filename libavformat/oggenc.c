@@ -2,29 +2,31 @@
  * Ogg muxer
  * Copyright (c) 2007 Baptiste Coudurier <baptiste dot coudurier at free dot fr>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include "libavutil/crc.h"
+#include "libavutil/mathematics.h"
 #include "libavutil/random_seed.h"
 #include "libavcodec/xiph.h"
 #include "libavcodec/bytestream.h"
 #include "libavcodec/flac.h"
 #include "avformat.h"
+#include "avio_internal.h"
 #include "internal.h"
 #include "vorbiscomment.h"
 
@@ -64,48 +66,48 @@ typedef struct {
     OGGPageList *page_list;
 } OGGContext;
 
-static void ogg_update_checksum(AVFormatContext *s, ByteIOContext *pb, int64_t crc_offset)
+static void ogg_update_checksum(AVFormatContext *s, AVIOContext *pb, int64_t crc_offset)
 {
-    int64_t pos = url_ftell(pb);
-    uint32_t checksum = get_checksum(pb);
-    url_fseek(pb, crc_offset, SEEK_SET);
-    put_be32(pb, checksum);
-    url_fseek(pb, pos, SEEK_SET);
+    int64_t pos = avio_tell(pb);
+    uint32_t checksum = ffio_get_checksum(pb);
+    avio_seek(pb, crc_offset, SEEK_SET);
+    avio_wb32(pb, checksum);
+    avio_seek(pb, pos, SEEK_SET);
 }
 
 static int ogg_write_page(AVFormatContext *s, OGGPage *page, int extra_flags)
 {
     OGGStreamContext *oggstream = s->streams[page->stream_index]->priv_data;
-    ByteIOContext *pb;
+    AVIOContext *pb;
     int64_t crc_offset;
     int ret, size;
     uint8_t *buf;
 
-    ret = url_open_dyn_buf(&pb);
+    ret = avio_open_dyn_buf(&pb);
     if (ret < 0)
         return ret;
-    init_checksum(pb, ff_crc04C11DB7_update, 0);
-    put_tag(pb, "OggS");
-    put_byte(pb, 0);
-    put_byte(pb, page->flags | extra_flags);
-    put_le64(pb, page->granule);
-    put_le32(pb, oggstream->serial_num);
-    put_le32(pb, oggstream->page_counter++);
-    crc_offset = url_ftell(pb);
-    put_le32(pb, 0); // crc
-    put_byte(pb, page->segments_count);
-    put_buffer(pb, page->segments, page->segments_count);
-    put_buffer(pb, page->data, page->size);
+    ffio_init_checksum(pb, ff_crc04C11DB7_update, 0);
+    ffio_wfourcc(pb, "OggS");
+    avio_w8(pb, 0);
+    avio_w8(pb, page->flags | extra_flags);
+    avio_wl64(pb, page->granule);
+    avio_wl32(pb, oggstream->serial_num);
+    avio_wl32(pb, oggstream->page_counter++);
+    crc_offset = avio_tell(pb);
+    avio_wl32(pb, 0); // crc
+    avio_w8(pb, page->segments_count);
+    avio_write(pb, page->segments, page->segments_count);
+    avio_write(pb, page->data, page->size);
 
     ogg_update_checksum(s, pb, crc_offset);
-    put_flush_packet(pb);
+    avio_flush(pb);
 
-    size = url_close_dyn_buf(pb, &buf);
+    size = avio_close_dyn_buf(pb, &buf);
     if (size < 0)
         return size;
 
-    put_buffer(s->pb, buf, size);
-    put_flush_packet(s->pb);
+    avio_write(s->pb, buf, size);
+    avio_flush(s->pb);
     av_free(buf);
     oggstream->page_count--;
     return 0;
@@ -220,9 +222,9 @@ static int ogg_buffer_data(AVFormatContext *s, AVStream *st,
 }
 
 static uint8_t *ogg_write_vorbiscomment(int offset, int bitexact,
-                                        int *header_len, AVMetadata **m, int framing_bit)
+                                        int *header_len, AVDictionary **m, int framing_bit)
 {
-    const char *vendor = bitexact ? "ffmpeg" : LIBAVFORMAT_IDENT;
+    const char *vendor = bitexact ? "Libav" : LIBAVFORMAT_IDENT;
     int size;
     uint8_t *p, *p0;
     unsigned int count;
@@ -246,13 +248,13 @@ static uint8_t *ogg_write_vorbiscomment(int offset, int bitexact,
 
 static int ogg_build_flac_headers(AVCodecContext *avctx,
                                   OGGStreamContext *oggstream, int bitexact,
-                                  AVMetadata **m)
+                                  AVDictionary **m)
 {
     enum FLACExtradataFormat format;
     uint8_t *streaminfo;
     uint8_t *p;
 
-    if (!ff_flac_is_extradata_valid(avctx, &format, &streaminfo))
+    if (!avpriv_flac_is_extradata_valid(avctx, &format, &streaminfo))
         return -1;
 
     // first packet: STREAMINFO
@@ -286,7 +288,7 @@ static int ogg_build_flac_headers(AVCodecContext *avctx,
 
 static int ogg_build_speex_headers(AVCodecContext *avctx,
                                    OGGStreamContext *oggstream, int bitexact,
-                                   AVMetadata **m)
+                                   AVDictionary **m)
 {
     uint8_t *p;
 
@@ -321,9 +323,9 @@ static int ogg_write_header(AVFormatContext *s)
         unsigned serial_num = i;
 
         if (st->codec->codec_type == AVMEDIA_TYPE_AUDIO)
-            av_set_pts_info(st, 64, 1, st->codec->sample_rate);
+            avpriv_set_pts_info(st, 64, 1, st->codec->sample_rate);
         else if (st->codec->codec_type == AVMEDIA_TYPE_VIDEO)
-            av_set_pts_info(st, 64, st->codec->time_base.num, st->codec->time_base.den);
+            avpriv_set_pts_info(st, 64, st->codec->time_base.num, st->codec->time_base.den);
         if (st->codec->codec_id != CODEC_ID_VORBIS &&
             st->codec->codec_id != CODEC_ID_THEORA &&
             st->codec->codec_id != CODEC_ID_SPEEX  &&
@@ -375,7 +377,7 @@ static int ogg_write_header(AVFormatContext *s)
             int header_type = st->codec->codec_id == CODEC_ID_VORBIS ? 3 : 0x81;
             int framing_bit = st->codec->codec_id == CODEC_ID_VORBIS ? 1 : 0;
 
-            if (ff_split_xiph_headers(st->codec->extradata, st->codec->extradata_size,
+            if (avpriv_split_xiph_headers(st->codec->extradata, st->codec->extradata_size,
                                       st->codec->codec_id == CODEC_ID_VORBIS ? 30 : 42,
                                       oggstream->header, oggstream->header_len) < 0) {
                 av_log(s, AV_LOG_ERROR, "Extradata corrupted\n");
@@ -502,15 +504,15 @@ static int ogg_write_trailer(AVFormatContext *s)
     return 0;
 }
 
-AVOutputFormat ogg_muxer = {
-    "ogg",
-    NULL_IF_CONFIG_SMALL("Ogg"),
-    "application/ogg",
-    "ogg,ogv,spx",
-    sizeof(OGGContext),
-    CODEC_ID_FLAC,
-    CODEC_ID_THEORA,
-    ogg_write_header,
-    ogg_write_packet,
-    ogg_write_trailer,
+AVOutputFormat ff_ogg_muxer = {
+    .name              = "ogg",
+    .long_name         = NULL_IF_CONFIG_SMALL("Ogg"),
+    .mime_type         = "application/ogg",
+    .extensions        = "ogg,ogv,spx",
+    .priv_data_size    = sizeof(OGGContext),
+    .audio_codec       = CODEC_ID_FLAC,
+    .video_codec       = CODEC_ID_THEORA,
+    .write_header      = ogg_write_header,
+    .write_packet      = ogg_write_packet,
+    .write_trailer     = ogg_write_trailer,
 };

@@ -2,20 +2,20 @@
  * Raw Video Decoder
  * Copyright (c) 2001 Fabrice Bellard
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -28,8 +28,7 @@
 #include "imgconvert.h"
 #include "raw.h"
 #include "libavutil/intreadwrite.h"
-#include "libavcore/imgutils.h"
-#include "libavcore/internal.h"
+#include "libavutil/imgutils.h"
 
 typedef struct RawVideoContext {
     uint32_t palette[AVPALETTE_COUNT];
@@ -79,6 +78,8 @@ static av_cold int raw_init_decoder(AVCodecContext *avctx)
 
     if (avctx->codec_tag == MKTAG('r','a','w',' '))
         avctx->pix_fmt = find_pix_fmt(pix_fmt_bps_mov, avctx->bits_per_coded_sample);
+    else if (avctx->codec_tag == MKTAG('W','R','A','W'))
+        avctx->pix_fmt = find_pix_fmt(pix_fmt_bps_avi, avctx->bits_per_coded_sample);
     else if (avctx->codec_tag)
         avctx->pix_fmt = find_pix_fmt(ff_raw_pix_fmt_tags, avctx->codec_tag);
     else if (avctx->pix_fmt == PIX_FMT_NONE && avctx->bits_per_coded_sample)
@@ -93,13 +94,13 @@ static av_cold int raw_init_decoder(AVCodecContext *avctx)
         if (!context->buffer)
             return -1;
     }
-    context->pic.pict_type = FF_I_TYPE;
+    context->pic.pict_type = AV_PICTURE_TYPE_I;
     context->pic.key_frame = 1;
 
     avctx->coded_frame= &context->pic;
 
     if((avctx->extradata_size >= 9 && !memcmp(avctx->extradata + avctx->extradata_size - 9, "BottomUp", 9)) ||
-       avctx->codec_tag == MKTAG( 3 ,  0 ,  0 ,  0 ))
+        avctx->codec_tag == MKTAG(3, 0, 0, 0) || avctx->codec_tag == MKTAG('W','R','A','W'))
         context->flip=1;
 
     return 0;
@@ -124,6 +125,7 @@ static int raw_decode(AVCodecContext *avctx,
     frame->interlaced_frame = avctx->coded_frame->interlaced_frame;
     frame->top_field_first = avctx->coded_frame->top_field_first;
     frame->reordered_opaque = avctx->reordered_opaque;
+    frame->pkt_pts          = avctx->pkt->pts;
 
     //2bpp and 4bpp raw in avi and mov (yes this is ugly ...)
     if (context->buffer) {
@@ -158,9 +160,13 @@ static int raw_decode(AVCodecContext *avctx,
         (av_pix_fmt_descriptors[avctx->pix_fmt].flags & PIX_FMT_PAL))){
         frame->data[1]= context->palette;
     }
-    if (avctx->palctrl && avctx->palctrl->palette_changed) {
-        memcpy(frame->data[1], avctx->palctrl->palette, AVPALETTE_SIZE);
-        avctx->palctrl->palette_changed = 0;
+    if (avctx->pix_fmt == PIX_FMT_PAL8) {
+        const uint8_t *pal = av_packet_get_side_data(avpkt, AV_PKT_DATA_PALETTE, NULL);
+
+        if (pal) {
+            memcpy(frame->data[1], pal, AVPALETTE_SIZE);
+            frame->palette_has_changed = 1;
+        }
     }
     if(avctx->pix_fmt==PIX_FMT_BGR24 && ((frame->linesize[0]+3)&~3)*avctx->height <= buf_size)
         frame->linesize[0] = (frame->linesize[0]+3)&~3;
@@ -195,14 +201,13 @@ static av_cold int raw_close_decoder(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec rawvideo_decoder = {
-    "rawvideo",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_RAWVIDEO,
-    sizeof(RawVideoContext),
-    raw_init_decoder,
-    NULL,
-    raw_close_decoder,
-    raw_decode,
+AVCodec ff_rawvideo_decoder = {
+    .name           = "rawvideo",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_RAWVIDEO,
+    .priv_data_size = sizeof(RawVideoContext),
+    .init           = raw_init_decoder,
+    .close          = raw_close_decoder,
+    .decode         = raw_decode,
     .long_name = NULL_IF_CONFIG_SMALL("raw video"),
 };

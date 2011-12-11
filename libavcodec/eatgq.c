@@ -2,20 +2,20 @@
  * Electronic Arts TGQ Video Decoder
  * Copyright (c) 2007-2008 Peter Ross <pross@xvid.org>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
@@ -218,7 +218,7 @@ static int tgq_decode_frame(AVCodecContext *avctx,
 
     if (!s->frame.data[0]) {
         s->frame.key_frame = 1;
-        s->frame.pict_type = FF_I_TYPE;
+        s->frame.pict_type = AV_PICTURE_TYPE_I;
         s->frame.buffer_hints = FF_BUFFER_HINTS_VALID;
         if (avctx->get_buffer(avctx, &s->frame)) {
             av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
@@ -243,15 +243,14 @@ static av_cold int tgq_decode_end(AVCodecContext *avctx){
     return 0;
 }
 
-AVCodec eatgq_decoder = {
-    "eatgq",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_TGQ,
-    sizeof(TgqContext),
-    tgq_decode_init,
-    NULL,
-    tgq_decode_end,
-    tgq_decode_frame,
-    CODEC_CAP_DR1,
+AVCodec ff_eatgq_decoder = {
+    .name           = "eatgq",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_TGQ,
+    .priv_data_size = sizeof(TgqContext),
+    .init           = tgq_decode_init,
+    .close          = tgq_decode_end,
+    .decode         = tgq_decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("Electronic Arts TGQ video"),
 };

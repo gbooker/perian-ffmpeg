@@ -2,20 +2,20 @@
  * Electronic Arts TGV Video Decoder
  * Copyright (c) 2007-2008 Peter Ross
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
@@ -32,7 +32,7 @@
 #define ALT_BITSTREAM_READER_LE
 #include "get_bits.h"
 #include "libavutil/lzo.h"
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 
 #define EA_PREAMBLE_SIZE    8
 #define kVGT_TAG MKTAG('k', 'V', 'G', 'T')
@@ -155,7 +155,7 @@ static int tgv_decode_inter(TgvContext * s, const uint8_t *buf, const uint8_t *b
     vector_bits       = AV_RL16(&buf[6]);
     buf += 12;
 
-    /* allocate codebook buffers as neccessary */
+    /* allocate codebook buffers as necessary */
     if (num_mvs > s->num_mvs) {
         s->mv_codebook = av_realloc(s->mv_codebook, num_mvs*2*sizeof(int));
         s->num_mvs = num_mvs;
@@ -286,7 +286,7 @@ static int tgv_decode_frame(AVCodecContext *avctx,
         s->frame.buffer_hints = FF_BUFFER_HINTS_VALID;
         s->frame.linesize[0] = s->width;
 
-        /* allocate additional 12 bytes to accomodate av_memcpy_backptr() OUTBUF_PADDED optimisation */
+        /* allocate additional 12 bytes to accommodate av_memcpy_backptr() OUTBUF_PADDED optimisation */
         s->frame.data[0] = av_malloc(s->width*s->height + 12);
         if (!s->frame.data[0])
             return AVERROR(ENOMEM);
@@ -300,7 +300,7 @@ static int tgv_decode_frame(AVCodecContext *avctx,
 
     if(chunk_type==kVGT_TAG) {
         s->frame.key_frame = 1;
-        s->frame.pict_type = FF_I_TYPE;
+        s->frame.pict_type = AV_PICTURE_TYPE_I;
         if (unpack(buf, buf_end, s->frame.data[0], s->avctx->width, s->avctx->height)<0) {
             av_log(avctx, AV_LOG_WARNING, "truncated intra frame\n");
             return -1;
@@ -311,7 +311,7 @@ static int tgv_decode_frame(AVCodecContext *avctx,
             return buf_size;
         }
         s->frame.key_frame = 0;
-        s->frame.pict_type = FF_P_TYPE;
+        s->frame.pict_type = AV_PICTURE_TYPE_P;
         if (tgv_decode_inter(s, buf, buf_end)<0) {
             av_log(avctx, AV_LOG_WARNING, "truncated inter frame\n");
             return -1;
@@ -334,14 +334,13 @@ static av_cold int tgv_decode_end(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec eatgv_decoder = {
-    "eatgv",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_TGV,
-    sizeof(TgvContext),
-    tgv_decode_init,
-    NULL,
-    tgv_decode_end,
-    tgv_decode_frame,
+AVCodec ff_eatgv_decoder = {
+    .name           = "eatgv",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_TGV,
+    .priv_data_size = sizeof(TgvContext),
+    .init           = tgv_decode_init,
+    .close          = tgv_decode_end,
+    .decode         = tgv_decode_frame,
     .long_name = NULL_IF_CONFIG_SMALL("Electronic Arts TGV video"),
 };

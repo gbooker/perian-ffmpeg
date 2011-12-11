@@ -2,20 +2,20 @@
  * Musepack decoder core
  * Copyright (c) 2006 Konstantin Shishkov
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -29,6 +29,7 @@
 #include "avcodec.h"
 #include "get_bits.h"
 #include "dsputil.h"
+#include "mpegaudiodsp.h"
 #include "mpegaudio.h"
 
 #include "mpc.h"
@@ -36,7 +37,7 @@
 
 void ff_mpc_init(void)
 {
-    ff_mpa_synth_init(ff_mpa_synth_window);
+    ff_mpa_synth_init_fixed(ff_mpa_synth_window_fixed);
 }
 
 /**
@@ -51,8 +52,9 @@ static void mpc_synth(MPCContext *c, int16_t *out, int channels)
     for(ch = 0;  ch < channels; ch++){
         samples_ptr = samples + ch;
         for(i = 0; i < SAMPLES_PER_BAND; i++) {
-            ff_mpa_synth_filter(c->synth_buf[ch], &(c->synth_buf_offset[ch]),
-                                ff_mpa_synth_window, &dither_state,
+            ff_mpa_synth_filter_fixed(&c->mpadsp,
+                                c->synth_buf[ch], &(c->synth_buf_offset[ch]),
+                                ff_mpa_synth_window_fixed, &dither_state,
                                 samples_ptr, channels,
                                 c->sb_samples[ch][i]);
             samples_ptr += 32 * channels;

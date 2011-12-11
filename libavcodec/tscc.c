@@ -2,20 +2,20 @@
  * TechSmith Camtasia decoder
  * Copyright (c) 2004 Konstantin Shishkov
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -60,6 +60,8 @@ typedef struct TsccContext {
     unsigned char* decomp_buf;
     int height;
     z_stream zstream;
+
+    uint32_t pal[256];
 } CamtasiaContext;
 
 /*
@@ -73,7 +75,6 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size, AVPac
     int buf_size = avpkt->size;
     CamtasiaContext * const c = avctx->priv_data;
     const unsigned char *encoded = buf;
-    unsigned char *outptr;
     int zret; // Zlib return code
     int len = buf_size;
 
@@ -86,8 +87,6 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size, AVPac
         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
         return -1;
     }
-
-    outptr = c->pic.data[0]; // Output image pointer
 
     zret = inflateReset(&(c->zstream));
     if (zret != Z_OK) {
@@ -111,11 +110,13 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size, AVPac
 
     /* make the palette available on the way out */
     if (c->avctx->pix_fmt == PIX_FMT_PAL8) {
-        memcpy(c->pic.data[1], c->avctx->palctrl->palette, AVPALETTE_SIZE);
-        if (c->avctx->palctrl->palette_changed) {
+        const uint8_t *pal = av_packet_get_side_data(avpkt, AV_PKT_DATA_PALETTE, NULL);
+
+        if (pal) {
             c->pic.palette_has_changed = 1;
-            c->avctx->palctrl->palette_changed = 0;
+            memcpy(c->pal, pal, AVPALETTE_SIZE);
         }
+        memcpy(c->pic.data[1], c->pal, AVPALETTE_SIZE);
     }
 
     *data_size = sizeof(AVFrame);
@@ -154,7 +155,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
              return -1;
     }
     c->bpp = avctx->bits_per_coded_sample;
-    // buffer size for RLE 'best' case when 2-byte code preceeds each pixel and there may be padding after it too
+    // buffer size for RLE 'best' case when 2-byte code precedes each pixel and there may be padding after it too
     c->decomp_size = (((avctx->width * c->bpp + 7) >> 3) + 3 * avctx->width + 2) * avctx->height + 2;
 
     /* Allocate decompression buffer */
@@ -197,16 +198,15 @@ static av_cold int decode_end(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec tscc_decoder = {
-        "camtasia",
-        AVMEDIA_TYPE_VIDEO,
-        CODEC_ID_TSCC,
-        sizeof(CamtasiaContext),
-        decode_init,
-        NULL,
-        decode_end,
-        decode_frame,
-        CODEC_CAP_DR1,
-        .long_name = NULL_IF_CONFIG_SMALL("TechSmith Screen Capture Codec"),
+AVCodec ff_tscc_decoder = {
+    .name           = "camtasia",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_TSCC,
+    .priv_data_size = sizeof(CamtasiaContext),
+    .init           = decode_init,
+    .close          = decode_end,
+    .decode         = decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
+    .long_name      = NULL_IF_CONFIG_SMALL("TechSmith Screen Capture Codec"),
 };
 

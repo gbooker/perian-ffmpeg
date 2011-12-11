@@ -2,20 +2,20 @@
  * Misc image conversion routines
  * Copyright (c) 2001, 2002, 2003 Fabrice Bellard
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -36,15 +36,11 @@
 #include "imgconvert.h"
 #include "libavutil/colorspace.h"
 #include "libavutil/pixdesc.h"
-#include "libavcore/imgutils.h"
-#include "libavcore/internal.h"
+#include "libavutil/imgutils.h"
 
 #if HAVE_MMX && HAVE_YASM
 #include "x86/dsputil_mmx.h"
 #endif
-
-#define xglue(x, y) x ## y
-#define glue(x, y) xglue(x, y)
 
 #define FF_COLOR_RGB      0 /**< RGB color space */
 #define FF_COLOR_GRAY     1 /**< gray color space */
@@ -418,23 +414,10 @@ void avcodec_get_chroma_sub_sample(enum PixelFormat pix_fmt, int *h_shift, int *
     *v_shift = av_pix_fmt_descriptors[pix_fmt].log2_chroma_h;
 }
 
+#if FF_API_GET_PIX_FMT_NAME
 const char *avcodec_get_pix_fmt_name(enum PixelFormat pix_fmt)
 {
-    if ((unsigned)pix_fmt >= PIX_FMT_NB)
-        return NULL;
-    else
-        return av_pix_fmt_descriptors[pix_fmt].name;
-}
-
-#if LIBAVCODEC_VERSION_MAJOR < 53
-enum PixelFormat avcodec_get_pix_fmt(const char *name)
-{
-    return av_get_pix_fmt(name);
-}
-
-void avcodec_pix_fmt_string (char *buf, int buf_size, enum PixelFormat pix_fmt)
-{
-    av_get_pix_fmt_string(buf, buf_size, pix_fmt);
+    return av_get_pix_fmt_name(pix_fmt);
 }
 #endif
 
@@ -442,23 +425,6 @@ int ff_is_hwaccel_pix_fmt(enum PixelFormat pix_fmt)
 {
     return av_pix_fmt_descriptors[pix_fmt].flags & PIX_FMT_HWACCEL;
 }
-
-#if LIBAVCODEC_VERSION_MAJOR < 53
-int ff_set_systematic_pal(uint32_t pal[256], enum PixelFormat pix_fmt){
-    return ff_set_systematic_pal2(pal, pix_fmt);
-}
-
-int ff_fill_linesize(AVPicture *picture, enum PixelFormat pix_fmt, int width)
-{
-    return av_image_fill_linesizes(picture->linesize, pix_fmt, width);
-}
-
-int ff_fill_pointer(AVPicture *picture, uint8_t *ptr, enum PixelFormat pix_fmt,
-                    int height)
-{
-    return av_image_fill_pointers(picture->data, pix_fmt, height, ptr, picture->linesize);
-}
-#endif
 
 int avpicture_fill(AVPicture *picture, uint8_t *ptr,
                    enum PixelFormat pix_fmt, int width, int height)
@@ -694,28 +660,6 @@ enum PixelFormat avcodec_find_best_pix_fmt(int64_t pix_fmt_mask, enum PixelForma
     return dst_pix_fmt;
 }
 
-#if LIBAVCODEC_VERSION_MAJOR < 53
-void ff_img_copy_plane(uint8_t *dst, int dst_wrap,
-                           const uint8_t *src, int src_wrap,
-                           int width, int height)
-{
-    av_image_copy_plane(dst, dst_wrap, src, src_wrap, width, height);
-}
-
-int ff_get_plane_bytewidth(enum PixelFormat pix_fmt, int width, int plane)
-{
-    return av_image_get_linesize(pix_fmt, width, plane);
-}
-
-void av_picture_data_copy(uint8_t *dst_data[4], int dst_linesize[4],
-                          uint8_t *src_data[4], int src_linesize[4],
-                          enum PixelFormat pix_fmt, int width, int height)
-{
-    av_image_copy(dst_data, dst_linesize, src_data, src_linesize,
-                  pix_fmt, width, height);
-}
-#endif
-
 void av_picture_copy(AVPicture *dst, const AVPicture *src,
                      enum PixelFormat pix_fmt, int width, int height)
 {
@@ -918,6 +862,7 @@ int av_picture_pad(AVPicture *dst, const AVPicture *src, int height, int width,
     return 0;
 }
 
+#if FF_API_GET_ALPHA_INFO
 /* NOTE: we scan all the pixels to have an exact information */
 static int get_alpha_info_pal8(const AVPicture *src, int width, int height)
 {
@@ -964,6 +909,7 @@ int img_get_alpha_info(const AVPicture *src,
     }
     return ret;
 }
+#endif
 
 #if !(HAVE_MMX && HAVE_YASM)
 /* filter parameters: [-1 4 2 4 -1] // 8 */

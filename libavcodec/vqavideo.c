@@ -2,28 +2,28 @@
  * Westwood Studios VQA Video Decoder
  * Copyright (C) 2003 the ffmpeg project
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 /**
  * @file
- * VQA Video Decoder by Mike Melanson (melanson@pcisys.net)
- * For more information about the VQA format, visit:
- *   http://wiki.multimedia.cx/index.php?title=VQA
+ * VQA Video Decoder
+ * @author Mike Melanson (melanson@pcisys.net)
+ * @see http://wiki.multimedia.cx/index.php?title=VQA
  *
  * The VQA video decoder outputs PAL8 or RGB555 colorspace data, depending
  * on the type of data in the file.
@@ -68,7 +68,7 @@
 #include <string.h>
 
 #include "libavutil/intreadwrite.h"
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 #include "avcodec.h"
 
 #define PALETTE_COUNT 256
@@ -89,14 +89,6 @@
 #define CPL0_TAG MKBETAG('C', 'P', 'L', '0')
 #define CPLZ_TAG MKBETAG('C', 'P', 'L', 'Z')
 #define VPTZ_TAG MKBETAG('V', 'P', 'T', 'Z')
-
-#define VQA_DEBUG 0
-
-#if VQA_DEBUG
-#define vqa_debug printf
-#else
-static inline void vqa_debug(const char *format, ...) { }
-#endif
 
 typedef struct VqaContext {
 
@@ -212,7 +204,7 @@ static void decode_format80(const unsigned char *src, int src_size,
 
     while (src_index < src_size) {
 
-        vqa_debug("      opcode %02X: ", src[src_index]);
+        av_dlog(NULL, "      opcode %02X: ", src[src_index]);
 
         /* 0x80 means that frame is finished */
         if (src[src_index] == 0x80)
@@ -231,7 +223,7 @@ static void decode_format80(const unsigned char *src, int src_size,
             src_index += 2;
             src_pos = AV_RL16(&src[src_index]);
             src_index += 2;
-            vqa_debug("(1) copy %X bytes from absolute pos %X\n", count, src_pos);
+            av_dlog(NULL, "(1) copy %X bytes from absolute pos %X\n", count, src_pos);
             CHECK_COUNT();
             for (i = 0; i < count; i++)
                 dest[dest_index + i] = dest[src_pos + i];
@@ -243,7 +235,7 @@ static void decode_format80(const unsigned char *src, int src_size,
             count = AV_RL16(&src[src_index]);
             src_index += 2;
             color = src[src_index++];
-            vqa_debug("(2) set %X bytes to %02X\n", count, color);
+            av_dlog(NULL, "(2) set %X bytes to %02X\n", count, color);
             CHECK_COUNT();
             memset(&dest[dest_index], color, count);
             dest_index += count;
@@ -253,7 +245,7 @@ static void decode_format80(const unsigned char *src, int src_size,
             count = (src[src_index++] & 0x3F) + 3;
             src_pos = AV_RL16(&src[src_index]);
             src_index += 2;
-            vqa_debug("(3) copy %X bytes from absolute pos %X\n", count, src_pos);
+            av_dlog(NULL, "(3) copy %X bytes from absolute pos %X\n", count, src_pos);
             CHECK_COUNT();
             for (i = 0; i < count; i++)
                 dest[dest_index + i] = dest[src_pos + i];
@@ -262,7 +254,7 @@ static void decode_format80(const unsigned char *src, int src_size,
         } else if (src[src_index] > 0x80) {
 
             count = src[src_index++] & 0x3F;
-            vqa_debug("(4) copy %X bytes from source to dest\n", count);
+            av_dlog(NULL, "(4) copy %X bytes from source to dest\n", count);
             CHECK_COUNT();
             memcpy(&dest[dest_index], &src[src_index], count);
             src_index += count;
@@ -273,7 +265,7 @@ static void decode_format80(const unsigned char *src, int src_size,
             count = ((src[src_index] & 0x70) >> 4) + 3;
             src_pos = AV_RB16(&src[src_index]) & 0x0FFF;
             src_index += 2;
-            vqa_debug("(5) copy %X bytes from relpos %X\n", count, src_pos);
+            av_dlog(NULL, "(5) copy %X bytes from relpos %X\n", count, src_pos);
             CHECK_COUNT();
             for (i = 0; i < count; i++)
                 dest[dest_index + i] = dest[dest_index - src_pos + i];
@@ -464,8 +456,6 @@ static void vqa_decode_chunk(VqaContext *s)
             switch (s->vqa_version) {
 
             case 1:
-/* still need sample media for this case (only one game, "Legend of
- * Kyrandia III : Malcolm's Revenge", is known to use this version) */
                 lobyte = s->decode_buffer[lobytes * 2];
                 hibyte = s->decode_buffer[(lobytes * 2) + 1];
                 vector_index = ((hibyte << 8) | lobyte) >> 3;
@@ -609,15 +599,14 @@ static av_cold int vqa_decode_end(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec vqa_decoder = {
-    "vqavideo",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_WS_VQA,
-    sizeof(VqaContext),
-    vqa_decode_init,
-    NULL,
-    vqa_decode_end,
-    vqa_decode_frame,
-    CODEC_CAP_DR1,
+AVCodec ff_vqa_decoder = {
+    .name           = "vqavideo",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_WS_VQA,
+    .priv_data_size = sizeof(VqaContext),
+    .init           = vqa_decode_init,
+    .close          = vqa_decode_end,
+    .decode         = vqa_decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("Westwood Studios VQA (Vector Quantized Animation) video"),
 };

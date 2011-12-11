@@ -2,20 +2,20 @@
  * Electronic Arts .cdata file Demuxer
  * Copyright (c) 2007 Peter Ross
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -29,6 +29,7 @@
  */
 
 #include "avformat.h"
+#include "internal.h"
 
 typedef struct {
   unsigned int channels;
@@ -47,11 +48,11 @@ static int cdata_probe(AVProbeData *p)
 static int cdata_read_header(AVFormatContext *s, AVFormatParameters *ap)
 {
     CdataDemuxContext *cdata = s->priv_data;
-    ByteIOContext *pb = s->pb;
+    AVIOContext *pb = s->pb;
     unsigned int sample_rate, header;
     AVStream *st;
 
-    header = get_be16(pb);
+    header = avio_rb16(pb);
     switch (header) {
         case 0x0400: cdata->channels = 1; break;
         case 0x0404: cdata->channels = 2; break;
@@ -61,10 +62,10 @@ static int cdata_read_header(AVFormatContext *s, AVFormatParameters *ap)
             return -1;
     };
 
-    sample_rate = get_be16(pb);
-    url_fskip(pb, 12);
+    sample_rate = avio_rb16(pb);
+    avio_skip(pb, 12);
 
-    st = av_new_stream(s, 0);
+    st = avformat_new_stream(s, NULL);
     if (!st)
         return AVERROR(ENOMEM);
     st->codec->codec_type = AVMEDIA_TYPE_AUDIO;
@@ -72,7 +73,7 @@ static int cdata_read_header(AVFormatContext *s, AVFormatParameters *ap)
     st->codec->codec_id = CODEC_ID_ADPCM_EA_XAS;
     st->codec->channels = cdata->channels;
     st->codec->sample_rate = sample_rate;
-    av_set_pts_info(st, 64, 1, sample_rate);
+    avpriv_set_pts_info(st, 64, 1, sample_rate);
 
     cdata->audio_pts = 0;
     return 0;
@@ -90,12 +91,12 @@ static int cdata_read_packet(AVFormatContext *s, AVPacket *pkt)
     return 0;
 }
 
-AVInputFormat ea_cdata_demuxer = {
-    "ea_cdata",
-    NULL_IF_CONFIG_SMALL("Electronic Arts cdata"),
-    sizeof(CdataDemuxContext),
-    cdata_probe,
-    cdata_read_header,
-    cdata_read_packet,
+AVInputFormat ff_ea_cdata_demuxer = {
+    .name           = "ea_cdata",
+    .long_name      = NULL_IF_CONFIG_SMALL("Electronic Arts cdata"),
+    .priv_data_size = sizeof(CdataDemuxContext),
+    .read_probe     = cdata_probe,
+    .read_header    = cdata_read_header,
+    .read_packet    = cdata_read_packet,
     .extensions = "cdata",
 };

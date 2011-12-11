@@ -5,21 +5,21 @@
 ;* Copyright (c) 2010 Loren Merritt
 ;* Copyright (c) 2010 Ronald S. Bultje
 ;*
-;* This file is part of FFmpeg.
+;* This file is part of Libav.
 ;*
-;* FFmpeg is free software; you can redistribute it and/or
+;* Libav is free software; you can redistribute it and/or
 ;* modify it under the terms of the GNU Lesser General Public
 ;* License as published by the Free Software Foundation; either
 ;* version 2.1 of the License, or (at your option) any later version.
 ;*
-;* FFmpeg is distributed in the hope that it will be useful,
+;* Libav is distributed in the hope that it will be useful,
 ;* but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;* Lesser General Public License for more details.
 ;*
 ;* You should have received a copy of the GNU Lesser General Public
-;* License along with FFmpeg; if not, write to the Free Software
-;* 51, Inc., Foundation Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+;* License along with Libav; if not, write to the Free Software
+;* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 ;******************************************************************************
 
 %include "x86inc.asm"
@@ -637,10 +637,6 @@ cglobal pred8x8_plane_%1, 2, 7, %2
 %endif
     paddw        m0, m1           ; sum of H coefficients
 
-    pmullw       m0, [pw_17]
-    paddw        m0, [pw_16]
-    psraw        m0, 5
-
     lea          r4, [r0+r2*4-1]
     lea          r3, [r0     -1]
     add          r4, r2
@@ -694,6 +690,10 @@ cglobal pred8x8_plane_%1, 2, 7, %2
     shl          r3, 4
     movd        r1d, m0
     movsx       r1d, r1w
+    imul        r1d, 17
+    add         r1d, 16
+    sar         r1d, 5
+    movd         m0, r1d
     add         r1d, r5d
     sub         r3d, r1d
     add         r1d, r1d
@@ -836,7 +836,6 @@ PRED8x8_H ssse3
 ;-----------------------------------------------------------------------------
 ; void pred8x8_top_dc_mmxext(uint8_t *src, int stride)
 ;-----------------------------------------------------------------------------
-%ifdef CONFIG_GPL
 cglobal pred8x8_top_dc_mmxext, 2,5
     sub         r0, r1
     movq       mm0, [r0]
@@ -927,7 +926,6 @@ cglobal pred8x8_dc_mmxext, 2,5
     movq [r4+r1*1], m1
     movq [r4+r1*2], m1
     RET
-%endif
 
 ;-----------------------------------------------------------------------------
 ; void pred8x8_dc_rv40(uint8_t *src, int stride)
@@ -1083,7 +1081,6 @@ cglobal pred8x8_tm_vp8_ssse3, 2,3,6
 ;-----------------------------------------------------------------------------
 ; void pred8x8l_top_dc(uint8_t *src, int has_topleft, int has_topright, int stride)
 ;-----------------------------------------------------------------------------
-%ifdef CONFIG_GPL
 %macro PRED8x8L_TOP_DC 1
 cglobal pred8x8l_top_dc_%1, 4,4
     sub          r0, r3
@@ -1249,7 +1246,10 @@ cglobal pred8x8l_horizontal_%1, 4,4
     sub          r0, r3
     lea          r2, [r0+r3*2]
     movq        mm0, [r0+r3*1-8]
-    punpckhbw   mm0, [r0+r3*0-8]
+    test         r1, r1
+    lea          r1, [r0+r3]
+    cmovnz       r1, r0
+    punpckhbw   mm0, [r1+r3*0-8]
     movq        mm1, [r2+r3*1-8]
     punpckhbw   mm1, [r0+r3*2-8]
     mov          r2, r0
@@ -1264,21 +1264,12 @@ cglobal pred8x8l_horizontal_%1, 4,4
     punpckhdq   mm3, mm1
     lea          r0, [r0+r3*2]
     movq        mm0, [r0+r3*0-8]
-    movq        mm1, [r2]
+    movq        mm1, [r1+r3*0-8]
     mov          r0, r2
     movq        mm4, mm3
     movq        mm2, mm3
     PALIGNR     mm4, mm0, 7, mm0
     PALIGNR     mm1, mm2, 1, mm2
-    test        r1, r1 ; top_left
-    jnz .do_left
-.fix_lt_1:
-    movq        mm5, mm3
-    pxor        mm5, mm4
-    psrlq       mm5, 56
-    psllq       mm5, 48
-    pxor        mm1, mm5
-.do_left:
     movq        mm0, mm4
     PRED4x4_LOWPASS mm2, mm1, mm4, mm3, mm5
     movq        mm4, mm0
@@ -2153,7 +2144,10 @@ cglobal pred8x8l_horizontal_up_%1, 4,4
     sub          r0, r3
     lea          r2, [r0+r3*2]
     movq        mm0, [r0+r3*1-8]
-    punpckhbw   mm0, [r0+r3*0-8]
+    test         r1, r1
+    lea          r1, [r0+r3]
+    cmovnz       r1, r0
+    punpckhbw   mm0, [r1+r3*0-8]
     movq        mm1, [r2+r3*1-8]
     punpckhbw   mm1, [r0+r3*2-8]
     mov          r2, r0
@@ -2168,21 +2162,12 @@ cglobal pred8x8l_horizontal_up_%1, 4,4
     punpckhdq   mm3, mm1
     lea          r0, [r0+r3*2]
     movq        mm0, [r0+r3*0-8]
-    movq        mm1, [r2]
+    movq        mm1, [r1+r3*0-8]
     mov          r0, r2
     movq        mm4, mm3
     movq        mm2, mm3
     PALIGNR     mm4, mm0, 7, mm0
     PALIGNR     mm1, mm2, 1, mm2
-    test        r1, r1
-    jnz .do_left
-.fix_lt_1:
-    movq        mm5, mm3
-    pxor        mm5, mm4
-    psrlq       mm5, 56
-    psllq       mm5, 48
-    pxor        mm1, mm5
-.do_left:
     movq       mm0, mm4
     PRED4x4_LOWPASS mm2, mm1, mm4, mm3, mm5
     movq       mm4, mm0
@@ -2488,7 +2473,6 @@ PRED8x8L_HORIZONTAL_DOWN sse2
 INIT_MMX
 %define PALIGNR PALIGNR_SSSE3
 PRED8x8L_HORIZONTAL_DOWN ssse3
-%endif
 
 ;-----------------------------------------------------------------------------
 ; void pred4x4_dc_mmxext(uint8_t *src, const uint8_t *topright, int stride)
@@ -2620,7 +2604,6 @@ cglobal pred4x4_vertical_vp8_mmxext, 3,3
 ;-----------------------------------------------------------------------------
 ; void pred4x4_down_left_mmxext(uint8_t *src, const uint8_t *topright, int stride)
 ;-----------------------------------------------------------------------------
-%ifdef CONFIG_GPL
 INIT_MMX
 cglobal pred4x4_down_left_mmxext, 3,3
     sub       r0, r2
@@ -2628,12 +2611,11 @@ cglobal pred4x4_down_left_mmxext, 3,3
     punpckldq m1, [r1]
     movq      m2, m1
     movq      m3, m1
-    movq      m4, m1
     psllq     m1, 8
     pxor      m2, m1
     psrlq     m2, 8
-    pxor      m3, m2
-    PRED4x4_LOWPASS m0, m1, m3, m4, m5
+    pxor      m2, m3
+    PRED4x4_LOWPASS m0, m1, m2, m3, m4
     lea       r1, [r0+r2*2]
     psrlq     m0, 8
     movd      [r0+r2*1], m0
@@ -2798,4 +2780,3 @@ cglobal pred4x4_down_right_mmxext, 3,3
     psrlq     m0, 8
     movh      [r0+r2*1], m0
     RET
-%endif

@@ -2,20 +2,20 @@
  * Sony Playstation (PSX) STR File Demuxer
  * Copyright (c) 2003 The ffmpeg Project
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -31,6 +31,7 @@
 
 #include "libavutil/intreadwrite.h"
 #include "avformat.h"
+#include "internal.h"
 
 #define RIFF_TAG MKTAG('R', 'I', 'F', 'F')
 #define CDXA_TAG MKTAG('C', 'D', 'X', 'A')
@@ -98,21 +99,21 @@ static int str_probe(AVProbeData *p)
 static int str_read_header(AVFormatContext *s,
                            AVFormatParameters *ap)
 {
-    ByteIOContext *pb = s->pb;
+    AVIOContext *pb = s->pb;
     StrDemuxContext *str = s->priv_data;
     unsigned char sector[RAW_CD_SECTOR_SIZE];
     int start;
     int i;
 
     /* skip over any RIFF header */
-    if (get_buffer(pb, sector, RIFF_HEADER_SIZE) != RIFF_HEADER_SIZE)
+    if (avio_read(pb, sector, RIFF_HEADER_SIZE) != RIFF_HEADER_SIZE)
         return AVERROR(EIO);
     if (AV_RL32(&sector[0]) == RIFF_TAG)
         start = RIFF_HEADER_SIZE;
     else
         start = 0;
 
-    url_fseek(pb, start, SEEK_SET);
+    avio_seek(pb, start, SEEK_SET);
 
     for(i=0; i<32; i++){
         str->channels[i].video_stream_index=
@@ -127,7 +128,7 @@ static int str_read_header(AVFormatContext *s,
 static int str_read_packet(AVFormatContext *s,
                            AVPacket *ret_pkt)
 {
-    ByteIOContext *pb = s->pb;
+    AVIOContext *pb = s->pb;
     StrDemuxContext *str = s->priv_data;
     unsigned char sector[RAW_CD_SECTOR_SIZE];
     int channel;
@@ -136,7 +137,7 @@ static int str_read_packet(AVFormatContext *s,
 
     while (1) {
 
-        if (get_buffer(pb, sector, RAW_CD_SECTOR_SIZE) != RAW_CD_SECTOR_SIZE)
+        if (avio_read(pb, sector, RAW_CD_SECTOR_SIZE) != RAW_CD_SECTOR_SIZE)
             return AVERROR(EIO);
 
         channel = sector[0x11];
@@ -162,10 +163,10 @@ static int str_read_packet(AVFormatContext *s,
 
                 if(str->channels[channel].video_stream_index < 0){
                     /* allocate a new AVStream */
-                    st = av_new_stream(s, 0);
+                    st = avformat_new_stream(s, NULL);
                     if (!st)
                         return AVERROR(ENOMEM);
-                    av_set_pts_info(st, 64, 1, 15);
+                    avpriv_set_pts_info(st, 64, 1, 15);
 
                     str->channels[channel].video_stream_index = st->index;
 
@@ -186,7 +187,7 @@ static int str_read_packet(AVFormatContext *s,
                     if (av_new_packet(pkt, sector_count*VIDEO_DATA_CHUNK_SIZE))
                         return AVERROR(EIO);
 
-                    pkt->pos= url_ftell(pb) - RAW_CD_SECTOR_SIZE;
+                    pkt->pos= avio_tell(pb) - RAW_CD_SECTOR_SIZE;
                     pkt->stream_index =
                         str->channels[channel].video_stream_index;
                 }
@@ -210,7 +211,7 @@ static int str_read_packet(AVFormatContext *s,
             if(str->channels[channel].audio_stream_index < 0){
                 int fmt = sector[0x13];
                 /* allocate a new AVStream */
-                st = av_new_stream(s, 0);
+                st = avformat_new_stream(s, NULL);
                 if (!st)
                     return AVERROR(ENOMEM);
 
@@ -224,7 +225,7 @@ static int str_read_packet(AVFormatContext *s,
             //    st->codec->bit_rate = 0; //FIXME;
                 st->codec->block_align = 128;
 
-                av_set_pts_info(st, 64, 128, st->codec->sample_rate);
+                avpriv_set_pts_info(st, 64, 128, st->codec->sample_rate);
             }
             pkt = ret_pkt;
             if (av_new_packet(pkt, 2304))
@@ -234,14 +235,13 @@ static int str_read_packet(AVFormatContext *s,
             pkt->stream_index =
                 str->channels[channel].audio_stream_index;
             return 0;
-            break;
         default:
             av_log(s, AV_LOG_WARNING, "Unknown sector type %02X\n", sector[0x12]);
             /* drop the sector and move on */
             break;
         }
 
-        if (url_feof(pb))
+        if (pb->eof_reached)
             return AVERROR(EIO);
     }
 }
@@ -258,12 +258,12 @@ static int str_read_close(AVFormatContext *s)
     return 0;
 }
 
-AVInputFormat str_demuxer = {
-    "psxstr",
-    NULL_IF_CONFIG_SMALL("Sony Playstation STR format"),
-    sizeof(StrDemuxContext),
-    str_probe,
-    str_read_header,
-    str_read_packet,
-    str_read_close,
+AVInputFormat ff_str_demuxer = {
+    .name           = "psxstr",
+    .long_name      = NULL_IF_CONFIG_SMALL("Sony Playstation STR format"),
+    .priv_data_size = sizeof(StrDemuxContext),
+    .read_probe     = str_probe,
+    .read_header    = str_read_header,
+    .read_packet    = str_read_packet,
+    .read_close     = str_read_close,
 };

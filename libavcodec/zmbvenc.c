@@ -2,20 +2,20 @@
  * Zip Motion Blocks Video (ZMBV) encoder
  * Copyright (c) 2006 Konstantin Shishkov
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -134,7 +134,7 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
     if(c->curfrm == c->keyint)
         c->curfrm = 0;
     *p = *pict;
-    p->pict_type= keyframe ? FF_I_TYPE : FF_P_TYPE;
+    p->pict_type= keyframe ? AV_PICTURE_TYPE_I : AV_PICTURE_TYPE_P;
     p->key_frame= keyframe;
     chpal = !keyframe && memcmp(p->data[1], c->pal2, 1024);
 
@@ -181,7 +181,7 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
         int x, y, bh2, bw2, xored;
         uint8_t *tsrc, *tprev;
         uint8_t *mv;
-        int mx, my, bv;
+        int mx, my;
 
         bw = (avctx->width + ZMBV_BLOCK - 1) / ZMBV_BLOCK;
         bh = (avctx->height + ZMBV_BLOCK - 1) / ZMBV_BLOCK;
@@ -197,7 +197,7 @@ static int encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size, void 
                 tsrc = src + x;
                 tprev = prev + x;
 
-                bv = zmbv_me(c, tsrc, p->linesize[0], tprev, c->pstride, x, y, &mx, &my, &xored);
+                zmbv_me(c, tsrc, p->linesize[0], tprev, c->pstride, x, y, &mx, &my, &xored);
                 mv[0] = (mx << 1) | !!xored;
                 mv[1] = my << 1;
                 tprev += mx + my * c->pstride;
@@ -323,14 +323,14 @@ static av_cold int encode_end(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec zmbv_encoder = {
-    "zmbv",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_ZMBV,
-    sizeof(ZmbvEncContext),
-    encode_init,
-    encode_frame,
-    encode_end,
+AVCodec ff_zmbv_encoder = {
+    .name           = "zmbv",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_ZMBV,
+    .priv_data_size = sizeof(ZmbvEncContext),
+    .init           = encode_init,
+    .encode         = encode_frame,
+    .close          = encode_end,
     .pix_fmts = (const enum PixelFormat[]){PIX_FMT_PAL8, PIX_FMT_NONE},
     .long_name = NULL_IF_CONFIG_SMALL("Zip Motion Blocks Video"),
 };

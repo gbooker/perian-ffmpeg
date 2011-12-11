@@ -2,25 +2,25 @@
  * Targa (.tga) image decoder
  * Copyright (c) 2006 Konstantin Shishkov
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include "libavutil/intreadwrite.h"
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 #include "avcodec.h"
 #include "targa.h"
 
@@ -33,22 +33,35 @@ typedef struct TargaContext {
     int compression_type;
 } TargaContext;
 
-static void targa_decode_rle(AVCodecContext *avctx, TargaContext *s, const uint8_t *src, uint8_t *dst, int w, int h, int stride, int bpp)
+#define CHECK_BUFFER_SIZE(buf, buf_end, needed, where) \
+    if(needed > buf_end - buf){ \
+        av_log(avctx, AV_LOG_ERROR, "Problem: unexpected end of data while reading " where "\n"); \
+        return -1; \
+    } \
+
+static int targa_decode_rle(AVCodecContext *avctx, TargaContext *s, const uint8_t *src, int src_size, uint8_t *dst, int w, int h, int stride, int bpp)
 {
     int i, x, y;
     int depth = (bpp + 1) >> 3;
     int type, count;
     int diff;
+    const uint8_t *src_end = src + src_size;
 
     diff = stride - w * depth;
     x = y = 0;
     while(y < h){
+        CHECK_BUFFER_SIZE(src, src_end, 1, "image type");
         type = *src++;
         count = (type & 0x7F) + 1;
         type &= 0x80;
         if((x + count > w) && (x + count + 1 > (h - y) * w)){
             av_log(avctx, AV_LOG_ERROR, "Packet went out of bounds: position (%i,%i) size %i\n", x, y, count);
-            return;
+            return -1;
+        }
+        if(type){
+            CHECK_BUFFER_SIZE(src, src_end, depth, "image data");
+        }else{
+            CHECK_BUFFER_SIZE(src, src_end, count * depth, "image data");
         }
         for(i = 0; i < count; i++){
             switch(depth){
@@ -81,6 +94,7 @@ static void targa_decode_rle(AVCodecContext *avctx, TargaContext *s, const uint8
         if(type)
             src += depth;
     }
+    return src_size;
 }
 
 static int decode_frame(AVCodecContext *avctx,
@@ -88,29 +102,31 @@ static int decode_frame(AVCodecContext *avctx,
                         AVPacket *avpkt)
 {
     const uint8_t *buf = avpkt->data;
-    int buf_size = avpkt->size;
+    const uint8_t *buf_end = avpkt->data + avpkt->size;
     TargaContext * const s = avctx->priv_data;
     AVFrame *picture = data;
     AVFrame * const p= (AVFrame*)&s->picture;
     uint8_t *dst;
     int stride;
-    int idlen, pal, compr, x, y, w, h, bpp, flags;
+    int idlen, compr, y, w, h, bpp, flags;
     int first_clr, colors, csize;
 
     /* parse image header */
+    CHECK_BUFFER_SIZE(buf, buf_end, 18, "header");
     idlen = *buf++;
-    pal = *buf++;
+    buf++; /* pal */
     compr = *buf++;
     first_clr = AV_RL16(buf); buf += 2;
     colors = AV_RL16(buf); buf += 2;
     csize = *buf++;
-    x = AV_RL16(buf); buf += 2;
+    buf += 2; /* x */
     y = AV_RL16(buf); buf += 2;
     w = AV_RL16(buf); buf += 2;
     h = AV_RL16(buf); buf += 2;
     bpp = *buf++;
     flags = *buf++;
     //skip identifier if any
+    CHECK_BUFFER_SIZE(buf, buf_end, idlen, "identifiers");
     buf += idlen;
     s->bpp = bpp;
     s->width = w;
@@ -155,14 +171,8 @@ static int decode_frame(AVCodecContext *avctx,
         stride = -p->linesize[0];
     }
 
-    if(avctx->pix_fmt == PIX_FMT_PAL8 && avctx->palctrl){
-        memcpy(p->data[1], avctx->palctrl->palette, AVPALETTE_SIZE);
-        if(avctx->palctrl->palette_changed){
-            p->palette_has_changed = 1;
-            avctx->palctrl->palette_changed = 0;
-        }
-    }
     if(colors){
+        size_t pal_size;
         if((colors + first_clr) > 256){
             av_log(avctx, AV_LOG_ERROR, "Incorrect palette: %i colors with offset %i\n", colors, first_clr);
             return -1;
@@ -171,8 +181,10 @@ static int decode_frame(AVCodecContext *avctx,
             av_log(avctx, AV_LOG_ERROR, "Palette entry size %i bits is not supported\n", csize);
             return -1;
         }
+        pal_size = colors * ((csize + 1) >> 3);
+        CHECK_BUFFER_SIZE(buf, buf_end, pal_size, "color table");
         if(avctx->pix_fmt != PIX_FMT_PAL8)//should not occur but skip palette anyway
-            buf += colors * ((csize + 1) >> 3);
+            buf += pal_size;
         else{
             int r, g, b, t;
             int32_t *pal = ((int32_t*)p->data[1]) + first_clr;
@@ -188,11 +200,17 @@ static int decode_frame(AVCodecContext *avctx,
     if((compr & (~TGA_RLE)) == TGA_NODATA)
         memset(p->data[0], 0, p->linesize[0] * s->height);
     else{
-        if(compr & TGA_RLE)
-            targa_decode_rle(avctx, s, buf, dst, avctx->width, avctx->height, stride, bpp);
-        else{
+        if(compr & TGA_RLE){
+            int res = targa_decode_rle(avctx, s, buf, buf_end - buf, dst, avctx->width, avctx->height, stride, bpp);
+            if (res < 0)
+                return -1;
+            buf += res;
+        }else{
+            size_t img_size = s->width * ((s->bpp + 1) >> 3);
+            CHECK_BUFFER_SIZE(buf, buf_end, img_size, "image data");
             for(y = 0; y < s->height; y++){
 #if HAVE_BIGENDIAN
+                int x;
                 if((s->bpp + 1) >> 3 == 2){
                     uint16_t *dst16 = (uint16_t*)dst;
                     for(x = 0; x < s->width; x++)
@@ -203,10 +221,10 @@ static int decode_frame(AVCodecContext *avctx,
                         dst32[x] = AV_RL32(buf + x * 4);
                 }else
 #endif
-                    memcpy(dst, buf, s->width * ((s->bpp + 1) >> 3));
+                    memcpy(dst, buf, img_size);
 
                 dst += stride;
-                buf += s->width * ((s->bpp + 1) >> 3);
+                buf += img_size;
             }
         }
     }
@@ -214,7 +232,7 @@ static int decode_frame(AVCodecContext *avctx,
     *picture= *(AVFrame*)&s->picture;
     *data_size = sizeof(AVPicture);
 
-    return buf_size;
+    return avpkt->size;
 }
 
 static av_cold int targa_init(AVCodecContext *avctx){
@@ -235,16 +253,14 @@ static av_cold int targa_end(AVCodecContext *avctx){
     return 0;
 }
 
-AVCodec targa_decoder = {
-    "targa",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_TARGA,
-    sizeof(TargaContext),
-    targa_init,
-    NULL,
-    targa_end,
-    decode_frame,
-    CODEC_CAP_DR1,
-    NULL,
+AVCodec ff_targa_decoder = {
+    .name           = "targa",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_TARGA,
+    .priv_data_size = sizeof(TargaContext),
+    .init           = targa_init,
+    .close          = targa_end,
+    .decode         = decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("Truevision Targa image"),
 };

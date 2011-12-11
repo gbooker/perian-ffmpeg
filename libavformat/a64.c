@@ -2,20 +2,20 @@
  * a64 muxer
  * Copyright (c) 2009 Tobias Bindhammer
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -55,9 +55,8 @@ static int a64_write_header(struct AVFormatContext *s)
         break;
     default:
         return AVERROR(EINVAL);
-        break;
     }
-    put_buffer(s->pb, header, 2);
+    avio_write(s->pb, header, 2);
     c->prev_pkt.size = 0;
     c->prev_frame_count = 0;
     return 0;
@@ -110,18 +109,18 @@ static int a64_write_packet(struct AVFormatContext *s, AVPacket *pkt)
             for(i = 0; i < num_frames; i++) {
                 if(pkt->data) {
                     /* if available, put newest charset chunk into buffer */
-                    put_buffer(s->pb, pkt->data + ch_chunksize * i, ch_chunksize);
+                    avio_write(s->pb, pkt->data + ch_chunksize * i, ch_chunksize);
                 } else {
                     /* a bit ugly, but is there an alternative to put many zeros? */
-                    for(j = 0; j < ch_chunksize; j++) put_byte(s->pb, 0);
+                    for(j = 0; j < ch_chunksize; j++) avio_w8(s->pb, 0);
                 }
 
                 if(c->prev_pkt.data) {
                     /* put frame (screen + colram) from last packet into buffer */
-                    put_buffer(s->pb, c->prev_pkt.data + charset_size + frame_size * i, frame_size);
+                    avio_write(s->pb, c->prev_pkt.data + charset_size + frame_size * i, frame_size);
                 } else {
                     /* a bit ugly, but is there an alternative to put many zeros? */
-                    for(j = 0; j < frame_size; j++) put_byte(s->pb, 0);
+                    for(j = 0; j < frame_size; j++) avio_w8(s->pb, 0);
                 }
             }
 
@@ -145,11 +144,11 @@ static int a64_write_packet(struct AVFormatContext *s, AVPacket *pkt)
         default:
             /* Write things as is. Nice for self-contained frames from non-multicolor modes or if played
              * directly from ram and not from a streaming device (rrnet/mmc) */
-            if(pkt) put_buffer(s->pb, pkt->data, pkt->size);
+            if(pkt) avio_write(s->pb, pkt->data, pkt->size);
         break;
     }
 
-    put_flush_packet(s->pb);
+    avio_flush(s->pb);
     return 0;
 }
 
@@ -164,14 +163,13 @@ static int a64_write_trailer(struct AVFormatContext *s)
     return 0;
 }
 
-AVOutputFormat a64_muxer = {
+AVOutputFormat ff_a64_muxer = {
     .name = "a64",
     .long_name = NULL_IF_CONFIG_SMALL("a64 - video for Commodore 64"),
-    .mime_type = NULL,
     .extensions = "a64, A64",
     .priv_data_size = sizeof (A64Context),
     .video_codec = CODEC_ID_A64_MULTI,
-    a64_write_header,
-    a64_write_packet,
-    a64_write_trailer
+    .write_header  = a64_write_header,
+    .write_packet  = a64_write_packet,
+    .write_trailer = a64_write_trailer
 };

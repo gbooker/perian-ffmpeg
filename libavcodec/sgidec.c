@@ -2,24 +2,24 @@
  * SGI image decoder
  * Todd Kirby <doubleshot@pacbell.net>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 #include "avcodec.h"
 #include "bytestream.h"
 #include "sgi.h"
@@ -215,7 +215,7 @@ static int decode_frame(AVCodecContext *avctx,
         return -1;
     }
 
-    p->pict_type = FF_I_TYPE;
+    p->pict_type = AV_PICTURE_TYPE_I;
     p->key_frame = 1;
     out_buf = p->data[0];
 
@@ -259,15 +259,14 @@ static av_cold int sgi_end(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec sgi_decoder = {
-    "sgi",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_SGI,
-    sizeof(SgiState),
-    sgi_init,
-    NULL,
-    sgi_end,
-    decode_frame,
+AVCodec ff_sgi_decoder = {
+    .name           = "sgi",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_SGI,
+    .priv_data_size = sizeof(SgiState),
+    .init           = sgi_init,
+    .close          = sgi_end,
+    .decode         = decode_frame,
     .long_name = NULL_IF_CONFIG_SMALL("SGI image"),
 };
 

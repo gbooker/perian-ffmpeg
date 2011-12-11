@@ -1,25 +1,24 @@
 /*
  * Copyright (c) 2004 Romain Dolbeau <romain@dolbeau.org>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-//#define DEBUG_ALIGNMENT
-#ifdef DEBUG_ALIGNMENT
+#ifdef DEBUG
 #define ASSERT_ALIGNED(ptr) assert(((unsigned long)ptr&0x0000000F));
 #else
 #define ASSERT_ALIGNED(ptr) ;
@@ -75,6 +74,7 @@
 #define noop(a) a
 #define add28(a) vec_add(v28ss, a)
 
+#ifdef PREFIX_h264_chroma_mc8_altivec
 static void PREFIX_h264_chroma_mc8_altivec(uint8_t * dst, uint8_t * src,
                                     int stride, int h, int x, int y) {
     DECLARE_ALIGNED(16, signed int, ABCD)[4] =
@@ -201,8 +201,10 @@ static void PREFIX_h264_chroma_mc8_altivec(uint8_t * dst, uint8_t * src,
         }
     }
 }
+#endif
 
 /* this code assume that stride % 16 == 0 */
+#ifdef PREFIX_no_rnd_vc1_chroma_mc8_altivec
 static void PREFIX_no_rnd_vc1_chroma_mc8_altivec(uint8_t * dst, uint8_t * src, int stride, int h, int x, int y) {
    DECLARE_ALIGNED(16, signed int, ABCD)[4] =
                         {((8 - x) * (8 - y)),
@@ -284,12 +286,14 @@ static void PREFIX_no_rnd_vc1_chroma_mc8_altivec(uint8_t * dst, uint8_t * src, i
         }
     }
 }
+#endif
 
 #undef noop
 #undef add28
 #undef CHROMA_MC8_ALTIVEC_CORE
 
 /* this code assume stride % 16 == 0 */
+#ifdef PREFIX_h264_qpel16_h_lowpass_altivec
 static void PREFIX_h264_qpel16_h_lowpass_altivec(uint8_t * dst, uint8_t * src, int dstStride, int srcStride) {
     register int i;
 
@@ -427,8 +431,10 @@ static void PREFIX_h264_qpel16_h_lowpass_altivec(uint8_t * dst, uint8_t * src, i
         dst += dstStride;
     }
 }
+#endif
 
 /* this code assume stride % 16 == 0 */
+#ifdef PREFIX_h264_qpel16_v_lowpass_altivec
 static void PREFIX_h264_qpel16_v_lowpass_altivec(uint8_t * dst, uint8_t * src, int dstStride, int srcStride) {
     register int i;
 
@@ -533,8 +539,10 @@ static void PREFIX_h264_qpel16_v_lowpass_altivec(uint8_t * dst, uint8_t * src, i
         dst += dstStride;
     }
 }
+#endif
 
 /* this code assume stride % 16 == 0 *and* tmp is properly aligned */
+#ifdef PREFIX_h264_qpel16_hv_lowpass_altivec
 static void PREFIX_h264_qpel16_hv_lowpass_altivec(uint8_t * dst, int16_t * tmp, uint8_t * src, int dstStride, int tmpStride, int srcStride) {
     register int i;
     LOAD_ZERO;
@@ -765,3 +773,4 @@ static void PREFIX_h264_qpel16_hv_lowpass_altivec(uint8_t * dst, int16_t * tmp, 
         dst += dstStride;
     }
 }
+#endif

@@ -1,20 +1,20 @@
 /*
  * Copyright (c) 2010 Mans Rullgard
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -22,10 +22,9 @@
 #include "asm-offsets.h"
 
 function ff_dct_unquantize_h263_inter_neon, export=1
-        add             r0,  r0,  #0x2200
-        add             r12, r0,  #BLOCK_LAST_INDEX-0x2200
+        add             r12, r0,  #BLOCK_LAST_INDEX
         ldr             r12, [r12, r2, lsl #2]
-        add             r0,  r0,  #INTER_SCANTAB_RASTER_END-0x2200
+        add             r0,  r0,  #INTER_SCANTAB_RASTER_END
         ldrb            r12, [r0, r12]
         sub             r2,  r3,  #1
         lsl             r0,  r3,  #1
@@ -58,6 +57,7 @@ function ff_dct_unquantize_h263_neon, export=1
         subs            r3,  r3,  #16
         vst1.16         {q0},     [r1,:128]!
         vst1.16         {q8},     [r1,:128]!
+        it              le
         bxle            lr
         cmp             r3,  #8
         bgt             1b
@@ -75,23 +75,24 @@ endfunc
 
 function ff_dct_unquantize_h263_intra_neon, export=1
         push            {r4-r6,lr}
+        add             r12, r0,  #BLOCK_LAST_INDEX
         ldr             r6,  [r0, #AC_PRED]
-        add             r5,  r0,  #0x2700
+        add             lr,  r0,  #INTER_SCANTAB_RASTER_END
         cmp             r6,  #0
+        it              ne
         movne           r12, #63
         bne             1f
-        add             lr,  r0,  #0x2200
-        add             r12, lr,  #BLOCK_LAST_INDEX-0x2200
-        add             lr,  lr,  #INTER_SCANTAB_RASTER_END-0x2200
         ldr             r12, [r12, r2, lsl #2]
         ldrb            r12, [lr, r12]
-1:      ldr             r5,  [r5, #H263_AIC-0x2700]
+1:      ldr             r5,  [r0, #H263_AIC]
         ldrsh           r4,  [r1]
         cmp             r5,  #0
         mov             r5,  r1
+        it              ne
         movne           r2,  #0
         bne             2f
         cmp             r2,  #4
+        it              ge
         addge           r0,  r0,  #4
         sub             r2,  r3,  #1
         ldr             r6,  [r0, #Y_DC_SCALE]

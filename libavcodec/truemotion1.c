@@ -2,20 +2,20 @@
  * Duck TrueMotion 1.0 Decoder
  * Copyright (C) 2003 Alex Beregszaszi & Mike Melanson
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -35,7 +35,7 @@
 
 #include "avcodec.h"
 #include "dsputil.h"
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 
 #include "truemotion1data.h"
 
@@ -353,7 +353,7 @@ static int truemotion1_decode_header(TrueMotion1Context *s)
         s->flags = FLAG_KEYFRAME;
 
     if (s->flags & FLAG_SPRITE) {
-        av_log(s->avctx, AV_LOG_INFO, "SPRITE frame found, please report the sample to the developers\n");
+        av_log_ask_for_sample(s->avctx, "SPRITE frame found.\n");
         /* FIXME header.width, height, xoffset and yoffset aren't initialized */
 #if 0
         s->w = header.width;
@@ -370,7 +370,7 @@ static int truemotion1_decode_header(TrueMotion1Context *s)
             if ((s->w < 213) && (s->h >= 176))
             {
                 s->flags |= FLAG_INTERPOLATED;
-                av_log(s->avctx, AV_LOG_INFO, "INTERPOLATION selected, please report the sample to the developers\n");
+                av_log_ask_for_sample(s->avctx, "INTERPOLATION selected.\n");
             }
         }
     }
@@ -891,15 +891,14 @@ static av_cold int truemotion1_decode_end(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec truemotion1_decoder = {
-    "truemotion1",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_TRUEMOTION1,
-    sizeof(TrueMotion1Context),
-    truemotion1_decode_init,
-    NULL,
-    truemotion1_decode_end,
-    truemotion1_decode_frame,
-    CODEC_CAP_DR1,
+AVCodec ff_truemotion1_decoder = {
+    .name           = "truemotion1",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_TRUEMOTION1,
+    .priv_data_size = sizeof(TrueMotion1Context),
+    .init           = truemotion1_decode_init,
+    .close          = truemotion1_decode_end,
+    .decode         = truemotion1_decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("Duck TrueMotion 1.0"),
 };

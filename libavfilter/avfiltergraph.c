@@ -3,20 +3,20 @@
  * Copyright (c) 2008 Vitor Sessak
  * Copyright (c) 2007 Bobby Bingham
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -32,14 +32,15 @@ AVFilterGraph *avfilter_graph_alloc(void)
     return av_mallocz(sizeof(AVFilterGraph));
 }
 
-void avfilter_graph_free(AVFilterGraph *graph)
+void avfilter_graph_free(AVFilterGraph **graph)
 {
-    if (!graph)
+    if (!*graph)
         return;
-    for (; graph->filter_count > 0; graph->filter_count --)
-        avfilter_free(graph->filters[graph->filter_count - 1]);
-    av_freep(&graph->scale_sws_opts);
-    av_freep(&graph->filters);
+    for (; (*graph)->filter_count > 0; (*graph)->filter_count--)
+        avfilter_free((*graph)->filters[(*graph)->filter_count - 1]);
+    av_freep(&(*graph)->scale_sws_opts);
+    av_freep(&(*graph)->filters);
+    av_freep(graph);
 }
 
 int avfilter_graph_add_filter(AVFilterGraph *graph, AVFilterContext *filter)
@@ -89,7 +90,7 @@ int ff_avfilter_graph_check_validity(AVFilterGraph *graph, AVClass *log_ctx)
                 av_log(log_ctx, AV_LOG_ERROR,
                        "Input pad \"%s\" for the filter \"%s\" of type \"%s\" not connected to any source\n",
                        filt->input_pads[j].name, filt->name, filt->filter->name);
-                return -1;
+                return AVERROR(EINVAL);
             }
         }
 
@@ -98,7 +99,7 @@ int ff_avfilter_graph_check_validity(AVFilterGraph *graph, AVClass *log_ctx)
                 av_log(log_ctx, AV_LOG_ERROR,
                        "Output pad \"%s\" for the filter \"%s\" of type \"%s\" not connected to any destination\n",
                        filt->output_pads[j].name, filt->name, filt->filter->name);
-                return -1;
+                return AVERROR(EINVAL);
             }
         }
     }
@@ -177,7 +178,7 @@ static int query_formats(AVFilterGraph *graph, AVClass *log_ctx)
                         av_log(log_ctx, AV_LOG_ERROR,
                                "Impossible to convert between the formats supported by the filter "
                                "'%s' and the filter '%s'\n", link->src->name, link->dst->name);
-                        return -1;
+                        return AVERROR(EINVAL);
                     }
                 }
             }
@@ -215,9 +216,11 @@ static void pick_formats(AVFilterGraph *graph)
 
 int ff_avfilter_graph_config_formats(AVFilterGraph *graph, AVClass *log_ctx)
 {
+    int ret;
+
     /* find supported formats from sub-filters, and merge along links */
-    if (query_formats(graph, log_ctx))
-        return -1;
+    if ((ret = query_formats(graph, log_ctx)) < 0)
+        return ret;
 
     /* Once everything is merged, it's possible that we'll still have
      * multiple valid media format choices. We pick the first one. */
@@ -226,7 +229,7 @@ int ff_avfilter_graph_config_formats(AVFilterGraph *graph, AVClass *log_ctx)
     return 0;
 }
 
-int avfilter_graph_config(AVFilterGraph *graphctx, AVClass *log_ctx)
+int avfilter_graph_config(AVFilterGraph *graphctx, void *log_ctx)
 {
     int ret;
 

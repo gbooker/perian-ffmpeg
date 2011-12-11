@@ -2,20 +2,20 @@
  * MD5 encoder (for codec/format testing)
  * Copyright (c) 2009 Reimar Döffinger, based on crcenc (c) 2002 Fabrice Bellard
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -36,8 +36,8 @@ static void md5_finish(struct AVFormatContext *s, char *buf)
     buf[offset] = '\n';
     buf[offset+1] = 0;
 
-    put_buffer(s->pb, buf, strlen(buf));
-    put_flush_packet(s->pb);
+    avio_write(s->pb, buf, strlen(buf));
+    avio_flush(s->pb);
 }
 
 #if CONFIG_MD5_MUXER
@@ -65,17 +65,17 @@ static int write_trailer(struct AVFormatContext *s)
     return 0;
 }
 
-AVOutputFormat md5_muxer = {
-    "md5",
-    NULL_IF_CONFIG_SMALL("MD5 testing format"),
-    NULL,
-    "",
-    PRIVSIZE,
-    CODEC_ID_PCM_S16LE,
-    CODEC_ID_RAWVIDEO,
-    write_header,
-    write_packet,
-    write_trailer,
+AVOutputFormat ff_md5_muxer = {
+    .name              = "md5",
+    .long_name         = NULL_IF_CONFIG_SMALL("MD5 testing format"),
+    .extensions        = "",
+    .priv_data_size    = PRIVSIZE,
+    .audio_codec       = CODEC_ID_PCM_S16LE,
+    .video_codec       = CODEC_ID_RAWVIDEO,
+    .write_header      = write_header,
+    .write_packet      = write_packet,
+    .write_trailer     = write_trailer,
+    .flags             = AVFMT_NOTIMESTAMPS,
 };
 #endif
 
@@ -95,16 +95,14 @@ static int framemd5_write_packet(struct AVFormatContext *s, AVPacket *pkt)
     return 0;
 }
 
-AVOutputFormat framemd5_muxer = {
-    "framemd5",
-    NULL_IF_CONFIG_SMALL("Per-frame MD5 testing format"),
-    NULL,
-    "",
-    PRIVSIZE,
-    CODEC_ID_PCM_S16LE,
-    CODEC_ID_RAWVIDEO,
-    NULL,
-    framemd5_write_packet,
-    NULL,
+AVOutputFormat ff_framemd5_muxer = {
+    .name              = "framemd5",
+    .long_name         = NULL_IF_CONFIG_SMALL("Per-frame MD5 testing format"),
+    .extensions        = "",
+    .priv_data_size    = PRIVSIZE,
+    .audio_codec       = CODEC_ID_PCM_S16LE,
+    .video_codec       = CODEC_ID_RAWVIDEO,
+    .write_packet      = framemd5_write_packet,
+    .flags             = AVFMT_VARIABLE_FPS,
 };
 #endif

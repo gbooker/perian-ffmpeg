@@ -2,20 +2,20 @@
  * Matroska constants
  * Copyright (c) 2003-2004 The ffmpeg Project
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -111,7 +111,7 @@
 #define MATROSKA_ID_VIDEOPIXELCROPR 0x54DD
 #define MATROSKA_ID_VIDEODISPLAYUNIT 0x54B2
 #define MATROSKA_ID_VIDEOFLAGINTERLACED 0x9A
-#define MATROSKA_ID_VIDEOSTEREOMODE 0x53B9
+#define MATROSKA_ID_VIDEOSTEREOMODE 0x53B8
 #define MATROSKA_ID_VIDEOASPECTRATIO 0x54B3
 #define MATROSKA_ID_VIDEOCOLORSPACE 0x2EB524
 
@@ -217,6 +217,24 @@ typedef enum {
   MATROSKA_TRACK_ENCODING_COMP_LZO         = 2,
   MATROSKA_TRACK_ENCODING_COMP_HEADERSTRIP = 3,
 } MatroskaTrackEncodingCompAlgo;
+
+typedef enum {
+  MATROSKA_VIDEO_STEREOMODE_TYPE_MONO               = 0,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_LEFT_RIGHT         = 1,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_BOTTOM_TOP         = 2,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_TOP_BOTTOM         = 3,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_CHECKERBOARD_RL    = 4,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_CHECKERBOARD_LR    = 5,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_ROW_INTERLEAVED_RL = 6,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_ROW_INTERLEAVED_LR = 7,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_COL_INTERLEAVED_RL = 8,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_COL_INTERLEAVED_LR = 9,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_ANAGLYPH_CYAN_RED  = 10,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_RIGHT_LEFT         = 11,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_ANAGLYPH_GREEN_MAG = 12,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_BOTH_EYES_BLOCK_LR = 13,
+  MATROSKA_VIDEO_STEREOMODE_TYPE_BOTH_EYES_BLOCK_RL = 14,
+} MatroskaVideoStereoModeType;
 
 /*
  * Matroska Codec IDs, strings

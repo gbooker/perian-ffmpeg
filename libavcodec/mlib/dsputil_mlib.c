@@ -2,20 +2,20 @@
  * Sun mediaLib optimized DSP utils
  * Copyright (c) 2001 Fabrice Bellard
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -421,9 +421,13 @@ static void ff_fdct_mlib(DCTELEM *data)
 
 void dsputil_init_mlib(DSPContext* c, AVCodecContext *avctx)
 {
-    c->get_pixels  = get_pixels_mlib;
+    const int high_bit_depth = avctx->bits_per_raw_sample > 8;
+
     c->diff_pixels = diff_pixels_mlib;
     c->add_pixels_clamped = add_pixels_clamped_mlib;
+
+    if (!high_bit_depth) {
+    c->get_pixels  = get_pixels_mlib;
 
     c->put_pixels_tab[0][0] = put_pixels16_mlib;
     c->put_pixels_tab[0][1] = put_pixels16_x2_mlib;
@@ -445,6 +449,7 @@ void dsputil_init_mlib(DSPContext* c, AVCodecContext *avctx)
 
     c->put_no_rnd_pixels_tab[0][0] = put_pixels16_mlib;
     c->put_no_rnd_pixels_tab[1][0] = put_pixels8_mlib;
+    }
 
     c->bswap_buf = bswap_buf_mlib;
 }

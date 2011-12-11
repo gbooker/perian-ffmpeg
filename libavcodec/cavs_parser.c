@@ -2,20 +2,20 @@
  * Chinese AVS video (AVS1-P2, JiZhun profile) parser.
  * Copyright (c) 2006  Stefan Gehrer <stefan.gehrer@gmx.de>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -97,11 +97,10 @@ static int cavsvideo_parse(AVCodecParserContext *s,
     return next;
 }
 
-AVCodecParser cavsvideo_parser = {
-    { CODEC_ID_CAVS },
-    sizeof(ParseContext1),
-    NULL,
-    cavsvideo_parse,
-    ff_parse1_close,
-    ff_mpeg4video_split,
+AVCodecParser ff_cavsvideo_parser = {
+    .codec_ids      = { CODEC_ID_CAVS },
+    .priv_data_size = sizeof(ParseContext1),
+    .parser_parse   = cavsvideo_parse,
+    .parser_close   = ff_parse1_close,
+    .split          = ff_mpeg4video_split,
 };

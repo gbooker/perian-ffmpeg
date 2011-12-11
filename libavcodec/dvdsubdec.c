@@ -1,21 +1,21 @@
 /*
- * DVD subtitle decoding for ffmpeg
+ * DVD subtitle decoding
  * Copyright (c) 2005 Fabrice Bellard
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include "avcodec.h"
@@ -34,8 +34,8 @@ static void yuv_a_to_rgba(const uint8_t *ycbcr, const uint8_t *alpha, uint32_t *
 
     for (i = num_values; i > 0; i--) {
         y = *ycbcr++;
-        cb = *ycbcr++;
         cr = *ycbcr++;
+        cb = *ycbcr++;
         YUV_TO_RGB1_CCIR(cb, cr);
         YUV_TO_RGB2_CCIR(r, g, b, y);
         *rgba++ = (*alpha++ << 24) | (r << 16) | (g << 8) | b;
@@ -190,7 +190,7 @@ static int decode_dvd_subtitles(AVSubtitle *sub_header,
     while (cmd_pos > 0 && cmd_pos < buf_size - 2 - offset_size) {
         date = AV_RB16(buf + cmd_pos);
         next_cmd_pos = READ_OFFSET(buf + cmd_pos + 2);
-        dprintf(NULL, "cmd_pos=0x%04x next=0x%04x date=%d\n",
+        av_dlog(NULL, "cmd_pos=0x%04x next=0x%04x date=%d\n",
                 cmd_pos, next_cmd_pos, date);
         pos = cmd_pos + 2 + offset_size;
         offset1 = -1;
@@ -198,7 +198,7 @@ static int decode_dvd_subtitles(AVSubtitle *sub_header,
         x1 = y1 = x2 = y2 = 0;
         while (pos < buf_size) {
             cmd = buf[pos++];
-            dprintf(NULL, "cmd=%02x\n", cmd);
+            av_dlog(NULL, "cmd=%02x\n", cmd);
             switch(cmd) {
             case 0x00:
                 /* menu subpicture */
@@ -231,7 +231,7 @@ static int decode_dvd_subtitles(AVSubtitle *sub_header,
                 alpha[1] = buf[pos + 1] >> 4;
                 alpha[0] = buf[pos + 1] & 0x0f;
                 pos += 2;
-            dprintf(NULL, "alpha=%x%x%x%x\n", alpha[0],alpha[1],alpha[2],alpha[3]);
+            av_dlog(NULL, "alpha=%x%x%x%x\n", alpha[0],alpha[1],alpha[2],alpha[3]);
                 break;
             case 0x05:
             case 0x85:
@@ -243,7 +243,7 @@ static int decode_dvd_subtitles(AVSubtitle *sub_header,
                 y2 = ((buf[pos + 4] & 0x0f) << 8) | buf[pos + 5];
                 if (cmd & 0x80)
                     is_8bit = 1;
-                dprintf(NULL, "x1=%d x2=%d y1=%d y2=%d\n", x1, x2, y1, y2);
+                av_dlog(NULL, "x1=%d x2=%d y1=%d y2=%d\n", x1, x2, y1, y2);
                 pos += 6;
                 break;
             case 0x06:
@@ -251,7 +251,7 @@ static int decode_dvd_subtitles(AVSubtitle *sub_header,
                     goto fail;
                 offset1 = AV_RB16(buf + pos);
                 offset2 = AV_RB16(buf + pos + 2);
-                dprintf(NULL, "offset1=0x%04x offset2=0x%04x\n", offset1, offset2);
+                av_dlog(NULL, "offset1=0x%04x offset2=0x%04x\n", offset1, offset2);
                 pos += 4;
                 break;
             case 0x86:
@@ -259,7 +259,7 @@ static int decode_dvd_subtitles(AVSubtitle *sub_header,
                     goto fail;
                 offset1 = AV_RB32(buf + pos);
                 offset2 = AV_RB32(buf + pos + 4);
-                dprintf(NULL, "offset1=0x%04x offset2=0x%04x\n", offset1, offset2);
+                av_dlog(NULL, "offset1=0x%04x offset2=0x%04x\n", offset1, offset2);
                 pos += 8;
                 break;
 
@@ -282,7 +282,7 @@ static int decode_dvd_subtitles(AVSubtitle *sub_header,
             case 0xff:
                 goto the_end;
             default:
-                dprintf(NULL, "unrecognised subpicture command 0x%x\n", cmd);
+                av_dlog(NULL, "unrecognised subpicture command 0x%x\n", cmd);
                 goto the_end;
             }
         }
@@ -475,7 +475,7 @@ static int dvdsub_decode(AVCodecContext *avctx,
         goto no_subtitle;
 
 #if defined(DEBUG)
-    dprintf(NULL, "start=%d ms end =%d ms\n",
+    av_dlog(NULL, "start=%d ms end =%d ms\n",
             sub->start_display_time,
             sub->end_display_time);
     ppm_save("/tmp/a.ppm", sub->rects[0]->pict.data[0],
@@ -486,14 +486,10 @@ static int dvdsub_decode(AVCodecContext *avctx,
     return buf_size;
 }
 
-AVCodec dvdsub_decoder = {
-    "dvdsub",
-    AVMEDIA_TYPE_SUBTITLE,
-    CODEC_ID_DVD_SUBTITLE,
-    0,
-    NULL,
-    NULL,
-    NULL,
-    dvdsub_decode,
+AVCodec ff_dvdsub_decoder = {
+    .name           = "dvdsub",
+    .type           = AVMEDIA_TYPE_SUBTITLE,
+    .id             = CODEC_ID_DVD_SUBTITLE,
+    .decode         = dvdsub_decode,
     .long_name = NULL_IF_CONFIG_SMALL("DVD subtitles"),
 };

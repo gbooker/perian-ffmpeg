@@ -2,20 +2,20 @@
  * Intel Indeo 2 codec
  * Copyright (c) 2005 Konstantin Shishkov
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -156,6 +156,13 @@ static int ir2_decode_frame(AVCodecContext *avctx,
         return -1;
     }
 
+    start = 48; /* hardcoded for now */
+
+    if (start >= buf_size) {
+        av_log(s->avctx, AV_LOG_ERROR, "input buffer size too small (%d)\n", buf_size);
+        return AVERROR_INVALIDDATA;
+    }
+
     s->decode_delta = buf[18];
 
     /* decide whether frame uses deltas or not */
@@ -163,9 +170,8 @@ static int ir2_decode_frame(AVCodecContext *avctx,
     for (i = 0; i < buf_size; i++)
         buf[i] = av_reverse[buf[i]];
 #endif
-    start = 48; /* hardcoded for now */
 
-    init_get_bits(&s->gb, buf + start, buf_size - start);
+    init_get_bits(&s->gb, buf + start, (buf_size - start) * 8);
 
     if (s->decode_delta) { /* intraframe */
         ir2_decode_plane(s, avctx->width, avctx->height,
@@ -224,15 +230,14 @@ static av_cold int ir2_decode_end(AVCodecContext *avctx){
     return 0;
 }
 
-AVCodec indeo2_decoder = {
-    "indeo2",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_INDEO2,
-    sizeof(Ir2Context),
-    ir2_decode_init,
-    NULL,
-    ir2_decode_end,
-    ir2_decode_frame,
-    CODEC_CAP_DR1,
+AVCodec ff_indeo2_decoder = {
+    .name           = "indeo2",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_INDEO2,
+    .priv_data_size = sizeof(Ir2Context),
+    .init           = ir2_decode_init,
+    .close          = ir2_decode_end,
+    .decode         = ir2_decode_frame,
+    .capabilities   = CODEC_CAP_DR1,
     .long_name = NULL_IF_CONFIG_SMALL("Intel Indeo 2"),
 };

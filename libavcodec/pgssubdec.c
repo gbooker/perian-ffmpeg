@@ -2,20 +2,20 @@
  * PGS subtitle decoder
  * Copyright (c) 2009 Stephen Backway
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -28,9 +28,7 @@
 #include "dsputil.h"
 #include "bytestream.h"
 #include "libavutil/colorspace.h"
-#include "libavcore/imgutils.h"
-
-//#define DEBUG_PACKET_CONTENTS
+#include "libavutil/imgutils.h"
 
 #define RGBA(r,g,b,a) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
 
@@ -141,7 +139,7 @@ static int decode_rle(AVCodecContext *avctx, AVSubtitle *sub,
         return -1;
     }
 
-    dprintf(avctx, "Pixel Count = %d, Area = %d\n", pixel_count, sub->rects[0]->w * sub->rects[0]->h);
+    av_dlog(avctx, "Pixel Count = %d, Area = %d\n", pixel_count, sub->rects[0]->w * sub->rects[0]->h);
 
     return 0;
 }
@@ -200,7 +198,7 @@ static int parse_picture_segment(AVCodecContext *avctx,
 
     /* Make sure the bitmap is not too large */
     if (avctx->width < width || avctx->height < height) {
-        av_log(avctx, AV_LOG_ERROR, "Bitmap dimensions larger then video.\n");
+        av_log(avctx, AV_LOG_ERROR, "Bitmap dimensions larger than video.\n");
         return -1;
     }
 
@@ -246,14 +244,14 @@ static void parse_palette_segment(AVCodecContext *avctx,
     while (buf < buf_end) {
         color_id  = bytestream_get_byte(&buf);
         y         = bytestream_get_byte(&buf);
-        cb        = bytestream_get_byte(&buf);
         cr        = bytestream_get_byte(&buf);
+        cb        = bytestream_get_byte(&buf);
         alpha     = bytestream_get_byte(&buf);
 
         YUV_TO_RGB1(cb, cr);
         YUV_TO_RGB2(r, g, b, y);
 
-        dprintf(avctx, "Color %d := (%d,%d,%d,%d)\n", color_id, r, g, b, alpha);
+        av_dlog(avctx, "Color %d := (%d,%d,%d,%d)\n", color_id, r, g, b, alpha);
 
         /* Store color in palette */
         ctx->clut[color_id] = RGBA(r,g,b,alpha);
@@ -282,7 +280,7 @@ static void parse_presentation_segment(AVCodecContext *avctx,
     int w = bytestream_get_be16(&buf);
     int h = bytestream_get_be16(&buf);
 
-    dprintf(avctx, "Video Dimensions %dx%d\n",
+    av_dlog(avctx, "Video Dimensions %dx%d\n",
             w, h);
     if (av_image_check_size(w, h, 0, avctx) >= 0)
         avcodec_set_dimensions(avctx, w, h);
@@ -317,7 +315,7 @@ static void parse_presentation_segment(AVCodecContext *avctx,
 
     /* TODO If cropping, cropping_x, cropping_y, cropping_width, cropping_height (all 2 bytes).*/
 
-    dprintf(avctx, "Subtitle Placement x=%d, y=%d\n", x, y);
+    av_dlog(avctx, "Subtitle Placement x=%d, y=%d\n", x, y);
 
     if (x > avctx->width || y > avctx->height) {
         av_log(avctx, AV_LOG_ERROR, "Subtitle out of video bounds. x = %d, y = %d, video width = %d, video height = %d.\n",
@@ -404,21 +402,18 @@ static int decode(AVCodecContext *avctx, void *data, int *data_size,
     const uint8_t *buf_end;
     uint8_t       segment_type;
     int           segment_length;
-
-#ifdef DEBUG_PACKET_CONTENTS
     int i;
 
-    av_log(avctx, AV_LOG_INFO, "PGS sub packet:\n");
+    av_dlog(avctx, "PGS sub packet:\n");
 
     for (i = 0; i < buf_size; i++) {
-        av_log(avctx, AV_LOG_INFO, "%02x ", buf[i]);
+        av_dlog(avctx, "%02x ", buf[i]);
         if (i % 16 == 15)
-            av_log(avctx, AV_LOG_INFO, "\n");
+            av_dlog(avctx, "\n");
     }
 
     if (i & 15)
-        av_log(avctx, AV_LOG_INFO, "\n");
-#endif
+        av_dlog(avctx, "\n");
 
     *data_size = 0;
 
@@ -433,7 +428,7 @@ static int decode(AVCodecContext *avctx, void *data, int *data_size,
         segment_type   = bytestream_get_byte(&buf);
         segment_length = bytestream_get_be16(&buf);
 
-        dprintf(avctx, "Segment Length %d, Segment Type %x\n", segment_length, segment_type);
+        av_dlog(avctx, "Segment Length %d, Segment Type %x\n", segment_length, segment_type);
 
         if (segment_type != DISPLAY_SEGMENT && segment_length > buf_end - buf)
             break;
@@ -473,14 +468,13 @@ static int decode(AVCodecContext *avctx, void *data, int *data_size,
     return buf_size;
 }
 
-AVCodec pgssub_decoder = {
-    "pgssub",
-    AVMEDIA_TYPE_SUBTITLE,
-    CODEC_ID_HDMV_PGS_SUBTITLE,
-    sizeof(PGSSubContext),
-    init_decoder,
-    NULL,
-    close_decoder,
-    decode,
+AVCodec ff_pgssub_decoder = {
+    .name           = "pgssub",
+    .type           = AVMEDIA_TYPE_SUBTITLE,
+    .id             = CODEC_ID_HDMV_PGS_SUBTITLE,
+    .priv_data_size = sizeof(PGSSubContext),
+    .init           = init_decoder,
+    .close          = close_decoder,
+    .decode         = decode,
     .long_name = NULL_IF_CONFIG_SMALL("HDMV Presentation Graphic Stream subtitles"),
 };

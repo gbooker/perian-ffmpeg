@@ -2,20 +2,20 @@
  * Interface to xvidcore for mpeg4 encoding
  * Copyright (c) 2004 Adam Thayer <krevnik@comcast.net>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -25,14 +25,12 @@
  * @author Adam Thayer (krevnik@comcast.net)
  */
 
-/* needed for mkstemp() */
-#define _XOPEN_SOURCE 600
-
 #include <xvid.h>
 #include <unistd.h>
 #include "avcodec.h"
 #include "libavutil/cpu.h"
 #include "libavutil/intreadwrite.h"
+#include "libavutil/mathematics.h"
 #include "libxvid_internal.h"
 #if !HAVE_MKSTEMP
 #include <fcntl.h>
@@ -139,7 +137,7 @@ static av_cold int xvid_encode_init(AVCodecContext *avctx)  {
     xvid_enc_create_t xvid_enc_create;
     xvid_enc_plugin_t plugins[7];
 
-    /* Bring in VOP flags from ffmpeg command-line */
+    /* Bring in VOP flags from avconv command-line */
     x->vop_flags = XVID_VOP_HALFPEL; /* Bare minimum quality */
     if( xvid_flags & CODEC_FLAG_4MV )
         x->vop_flags |= XVID_VOP_INTER4V; /* Level 3 */
@@ -193,7 +191,7 @@ static av_cold int xvid_encode_init(AVCodecContext *avctx)  {
            break;
     }
 
-    /* Bring in VOL flags from ffmpeg command-line */
+    /* Bring in VOL flags from avconv command-line */
     x->vol_flags = 0;
     if( xvid_flags & CODEC_FLAG_GMC ) {
         x->vol_flags |= XVID_VOL_GMC;
@@ -450,9 +448,9 @@ static int xvid_encode_frame(AVCodecContext *avctx,
     xvid_enc_frame.vol_flags = x->vol_flags;
     xvid_enc_frame.motion = x->me_flags;
     xvid_enc_frame.type =
-        picture->pict_type == FF_I_TYPE ? XVID_TYPE_IVOP :
-        picture->pict_type == FF_P_TYPE ? XVID_TYPE_PVOP :
-        picture->pict_type == FF_B_TYPE ? XVID_TYPE_BVOP :
+        picture->pict_type == AV_PICTURE_TYPE_I ? XVID_TYPE_IVOP :
+        picture->pict_type == AV_PICTURE_TYPE_P ? XVID_TYPE_PVOP :
+        picture->pict_type == AV_PICTURE_TYPE_B ? XVID_TYPE_BVOP :
                                           XVID_TYPE_AUTO;
 
     /* Pixel aspect ratio setting */
@@ -493,13 +491,13 @@ static int xvid_encode_frame(AVCodecContext *avctx,
     if( 0 <= xerr ) {
         p->quality = xvid_enc_stats.quant * FF_QP2LAMBDA;
         if( xvid_enc_stats.type == XVID_TYPE_PVOP )
-            p->pict_type = FF_P_TYPE;
+            p->pict_type = AV_PICTURE_TYPE_P;
         else if( xvid_enc_stats.type == XVID_TYPE_BVOP )
-            p->pict_type = FF_B_TYPE;
+            p->pict_type = AV_PICTURE_TYPE_B;
         else if( xvid_enc_stats.type == XVID_TYPE_SVOP )
-            p->pict_type = FF_S_TYPE;
+            p->pict_type = AV_PICTURE_TYPE_S;
         else
-            p->pict_type = FF_I_TYPE;
+            p->pict_type = AV_PICTURE_TYPE_I;
         if( xvid_enc_frame.out_flags & XVID_KEYFRAME ) {
             p->key_frame = 1;
             if( x->quicktime_format )
@@ -527,18 +525,14 @@ static av_cold int xvid_encode_close(AVCodecContext *avctx) {
 
     xvid_encore(x->encoder_handle, XVID_ENC_DESTROY, NULL, NULL);
 
-    if( avctx->extradata != NULL )
-        av_freep(&avctx->extradata);
+    av_freep(&avctx->extradata);
     if( x->twopassbuffer != NULL ) {
         av_free(x->twopassbuffer);
         av_free(x->old_twopassbuffer);
     }
-    if( x->twopassfile != NULL )
-        av_free(x->twopassfile);
-    if( x->intra_matrix != NULL )
-        av_free(x->intra_matrix);
-    if( x->inter_matrix != NULL )
-        av_free(x->inter_matrix);
+    av_free(x->twopassfile);
+    av_free(x->intra_matrix);
+    av_free(x->inter_matrix);
 
     return 0;
 }
@@ -675,7 +669,7 @@ static int xvid_ff_2pass_create(xvid_plg_create_t * param,
     /* This is because we can safely prevent a buffer overflow */
     log[0] = 0;
     snprintf(log, BUFFER_REMAINING(log),
-        "# ffmpeg 2-pass log file, using xvid codec\n");
+        "# avconv 2-pass log file, using xvid codec\n");
     snprintf(BUFFER_CAT(log), BUFFER_REMAINING(log),
         "# Do not modify. libxvidcore version: %d.%d.%d\n\n",
         XVID_VERSION_MAJOR(XVID_VERSION),
@@ -755,7 +749,7 @@ static int xvid_ff_2pass_before(struct xvid_context *ref,
 static int xvid_ff_2pass_after(struct xvid_context *ref,
                                 xvid_plg_data_t *param) {
     char *log = ref->twopassbuffer;
-    char *frame_types = " ipbs";
+    const char *frame_types = " ipbs";
     char frame_type;
 
     /* Quick bounds check */
@@ -814,14 +808,14 @@ int xvid_ff_2pass(void *ref, int cmd, void *p1, void *p2) {
 /**
  * Xvid codec definition for libavcodec.
  */
-AVCodec libxvid_encoder = {
-    "libxvid",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_MPEG4,
-    sizeof(struct xvid_context),
-    xvid_encode_init,
-    xvid_encode_frame,
-    xvid_encode_close,
+AVCodec ff_libxvid_encoder = {
+    .name           = "libxvid",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_MPEG4,
+    .priv_data_size = sizeof(struct xvid_context),
+    .init           = xvid_encode_init,
+    .encode         = xvid_encode_frame,
+    .close          = xvid_encode_close,
     .pix_fmts= (const enum PixelFormat[]){PIX_FMT_YUV420P, PIX_FMT_NONE},
     .long_name= NULL_IF_CONFIG_SMALL("libxvidcore MPEG-4 part 2"),
 };

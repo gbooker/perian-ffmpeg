@@ -2,20 +2,20 @@
  * Chinese AVS video (AVS1-P2, JiZhun profile) decoder.
  * Copyright (c) 2006  Stefan Gehrer <stefan.gehrer@gmx.de>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -233,15 +233,16 @@ extern const struct dec_2dvlc ff_cavs_chroma_dec[5];
 extern const uint8_t     ff_cavs_chroma_qp[64];
 extern const uint8_t     ff_cavs_scan3x3[4];
 extern const uint8_t     ff_cavs_partition_flags[30];
-extern const int_fast8_t ff_left_modifier_l[8];
-extern const int_fast8_t ff_top_modifier_l[8];
-extern const int_fast8_t ff_left_modifier_c[7];
-extern const int_fast8_t ff_top_modifier_c[7];
+extern const int8_t      ff_left_modifier_l[8];
+extern const int8_t      ff_top_modifier_l[8];
+extern const int8_t      ff_left_modifier_c[7];
+extern const int8_t      ff_top_modifier_c[7];
 extern const cavs_vector ff_cavs_intra_mv;
 extern const cavs_vector ff_cavs_un_mv;
 extern const cavs_vector ff_cavs_dir_mv;
 
-static inline void modify_pred(const int_fast8_t *mod_table, int *mode) {
+static inline void modify_pred(const int8_t *mod_table, int *mode)
+{
     *mode = mod_table[*mode];
     if(*mode < 0) {
         av_log(NULL, AV_LOG_ERROR, "Illegal intra prediction mode\n");
@@ -278,7 +279,7 @@ static inline void set_mv_intra(AVSContext *h) {
     set_mvs(&h->mv[MV_FWD_X0], BLK_16X16);
     h->mv[MV_BWD_X0] = ff_cavs_intra_mv;
     set_mvs(&h->mv[MV_BWD_X0], BLK_16X16);
-    if(h->pic_type != FF_B_TYPE)
+    if(h->pic_type != AV_PICTURE_TYPE_B)
         h->col_type_base[h->mbidx] = I_8X8;
 }
 

@@ -2,26 +2,26 @@
  * D-Cinema audio demuxer
  * Copyright (c) 2005 Reimar Döffinger
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include "avformat.h"
 
 static int daud_header(AVFormatContext *s, AVFormatParameters *ap) {
-    AVStream *st = av_new_stream(s, 0);
+    AVStream *st = avformat_new_stream(s, NULL);
     if (!st)
         return AVERROR(ENOMEM);
     st->codec->codec_type = AVMEDIA_TYPE_AUDIO;
@@ -36,12 +36,12 @@ static int daud_header(AVFormatContext *s, AVFormatParameters *ap) {
 }
 
 static int daud_packet(AVFormatContext *s, AVPacket *pkt) {
-    ByteIOContext *pb = s->pb;
+    AVIOContext *pb = s->pb;
     int ret, size;
-    if (url_feof(pb))
+    if (pb->eof_reached)
         return AVERROR(EIO);
-    size = get_be16(pb);
-    get_be16(pb); // unknown
+    size = avio_rb16(pb);
+    avio_rb16(pb); // unknown
     ret = av_get_packet(pb, pkt, size);
     pkt->stream_index = 0;
     return ret;
@@ -57,39 +57,37 @@ static int daud_write_header(struct AVFormatContext *s)
 
 static int daud_write_packet(struct AVFormatContext *s, AVPacket *pkt)
 {
-    put_be16(s->pb, pkt->size);
-    put_be16(s->pb, 0x8010); // unknown
-    put_buffer(s->pb, pkt->data, pkt->size);
-    put_flush_packet(s->pb);
+    if (pkt->size > 65535) {
+        av_log(s, AV_LOG_ERROR,
+               "Packet size too large for s302m. (%d > 65535)\n", pkt->size);
+        return -1;
+    }
+    avio_wb16(s->pb, pkt->size);
+    avio_wb16(s->pb, 0x8010); // unknown
+    avio_write(s->pb, pkt->data, pkt->size);
+    avio_flush(s->pb);
     return 0;
 }
 
 #if CONFIG_DAUD_DEMUXER
-AVInputFormat daud_demuxer = {
-    "daud",
-    NULL_IF_CONFIG_SMALL("D-Cinema audio format"),
-    0,
-    NULL,
-    daud_header,
-    daud_packet,
-    NULL,
-    NULL,
+AVInputFormat ff_daud_demuxer = {
+    .name           = "daud",
+    .long_name      = NULL_IF_CONFIG_SMALL("D-Cinema audio format"),
+    .read_header    = daud_header,
+    .read_packet    = daud_packet,
     .extensions = "302",
 };
 #endif
 
 #if CONFIG_DAUD_MUXER
-AVOutputFormat daud_muxer =
-{
-    "daud",
-    NULL_IF_CONFIG_SMALL("D-Cinema audio format"),
-    NULL,
-    "302",
-    0,
-    CODEC_ID_PCM_S24DAUD,
-    CODEC_ID_NONE,
-    daud_write_header,
-    daud_write_packet,
-    .flags= AVFMT_NOTIMESTAMPS,
+AVOutputFormat ff_daud_muxer = {
+    .name         = "daud",
+    .long_name    = NULL_IF_CONFIG_SMALL("D-Cinema audio format"),
+    .extensions   = "302",
+    .audio_codec  = CODEC_ID_PCM_S24DAUD,
+    .video_codec  = CODEC_ID_NONE,
+    .write_header = daud_write_header,
+    .write_packet = daud_write_packet,
+    .flags        = AVFMT_NOTIMESTAMPS,
 };
 #endif

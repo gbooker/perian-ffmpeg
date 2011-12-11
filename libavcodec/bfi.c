@@ -2,20 +2,20 @@
  * Brute Force & Ignorance (BFI) video decoder
  * Copyright (c) 2008 Sisir Koppaka
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -23,7 +23,7 @@
  * @file
  * @brief Brute Force & Ignorance (.bfi) video decoder
  * @author Sisir Koppaka ( sisir.koppaka at gmail dot com )
- * @sa http://wiki.multimedia.cx/index.php?title=BFI
+ * @see http://wiki.multimedia.cx/index.php?title=BFI
  */
 
 #include "libavutil/common.h"
@@ -68,7 +68,7 @@ static int bfi_decode_frame(AVCodecContext * avctx, void *data,
 
     /* Set frame parameters and palette, if necessary */
     if (!avctx->frame_number) {
-        bfi->frame.pict_type = FF_I_TYPE;
+        bfi->frame.pict_type = AV_PICTURE_TYPE_I;
         bfi->frame.key_frame = 1;
         /* Setting the palette */
         if(avctx->extradata_size>768) {
@@ -87,7 +87,7 @@ static int bfi_decode_frame(AVCodecContext * avctx, void *data,
         }
         bfi->frame.palette_has_changed = 1;
     } else {
-        bfi->frame.pict_type = FF_P_TYPE;
+        bfi->frame.pict_type = AV_PICTURE_TYPE_P;
         bfi->frame.key_frame = 0;
     }
 
@@ -180,7 +180,7 @@ static av_cold int bfi_decode_close(AVCodecContext * avctx)
     return 0;
 }
 
-AVCodec bfi_decoder = {
+AVCodec ff_bfi_decoder = {
     .name = "bfi",
     .type = AVMEDIA_TYPE_VIDEO,
     .id = CODEC_ID_BFI,

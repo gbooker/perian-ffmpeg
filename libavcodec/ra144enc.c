@@ -2,20 +2,20 @@
  * Real Audio 1.0 (14.4K) encoder
  * Copyright (c) 2010 Francesco Lavra <francescolavra@interfree.it>
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -29,7 +29,6 @@
 
 #include "avcodec.h"
 #include "put_bits.h"
-#include "lpc.h"
 #include "celp_filters.h"
 #include "ra144.h"
 
@@ -37,6 +36,7 @@
 static av_cold int ra144_encode_init(AVCodecContext * avctx)
 {
     RA144Context *ractx;
+    int ret;
 
     if (avctx->sample_fmt != AV_SAMPLE_FMT_S16) {
         av_log(avctx, AV_LOG_ERROR, "invalid sample format\n");
@@ -53,7 +53,16 @@ static av_cold int ra144_encode_init(AVCodecContext * avctx)
     ractx->lpc_coef[0] = ractx->lpc_tables[0];
     ractx->lpc_coef[1] = ractx->lpc_tables[1];
     ractx->avctx = avctx;
-    dsputil_init(&ractx->dsp, avctx);
+    ret = ff_lpc_init(&ractx->lpc_ctx, avctx->frame_size, LPC_ORDER,
+                      FF_LPC_TYPE_LEVINSON);
+    return ret;
+}
+
+
+static av_cold int ra144_encode_close(AVCodecContext *avctx)
+{
+    RA144Context *ractx = avctx->priv_data;
+    ff_lpc_end(&ractx->lpc_ctx);
     return 0;
 }
 
@@ -451,8 +460,8 @@ static int ra144_encode_frame(AVCodecContext *avctx, uint8_t *frame,
     energy = ff_energy_tab[quantize(ff_t_sqrt(energy >> 5) >> 10, ff_energy_tab,
                                     32)];
 
-    ff_lpc_calc_coefs(&ractx->dsp, lpc_data, NBLOCKS * BLOCKSIZE, LPC_ORDER,
-                      LPC_ORDER, 16, lpc_coefs, shift, AV_LPC_TYPE_LEVINSON,
+    ff_lpc_calc_coefs(&ractx->lpc_ctx, lpc_data, NBLOCKS * BLOCKSIZE, LPC_ORDER,
+                      LPC_ORDER, 16, lpc_coefs, shift, FF_LPC_TYPE_LEVINSON,
                       0, ORDER_METHOD_EST, 12, 0);
     for (i = 0; i < LPC_ORDER; i++)
         block_coefs[NBLOCKS - 1][i] = -(lpc_coefs[LPC_ORDER - 1][i] <<
@@ -499,13 +508,15 @@ static int ra144_encode_frame(AVCodecContext *avctx, uint8_t *frame,
 }
 
 
-AVCodec ra_144_encoder =
-{
-    "real_144",
-    AVMEDIA_TYPE_AUDIO,
-    CODEC_ID_RA_144,
-    sizeof(RA144Context),
-    ra144_encode_init,
-    ra144_encode_frame,
-    .long_name = NULL_IF_CONFIG_SMALL("RealAudio 1.0 (14.4K) encoder"),
+AVCodec ff_ra_144_encoder = {
+    .name           = "real_144",
+    .type           = AVMEDIA_TYPE_AUDIO,
+    .id             = CODEC_ID_RA_144,
+    .priv_data_size = sizeof(RA144Context),
+    .init           = ra144_encode_init,
+    .encode         = ra144_encode_frame,
+    .close          = ra144_encode_close,
+    .sample_fmts    = (const enum AVSampleFormat[]){ AV_SAMPLE_FMT_S16,
+                                                     AV_SAMPLE_FMT_NONE },
+    .long_name      = NULL_IF_CONFIG_SMALL("RealAudio 1.0 (14.4K) encoder"),
 };

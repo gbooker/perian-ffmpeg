@@ -5,24 +5,24 @@
  *
  * This file is based on flashsvenc.c.
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libavcore/imgutils.h"
+#include "libavutil/imgutils.h"
 #include "avcodec.h"
 #include "bytestream.h"
 
@@ -295,11 +295,11 @@ static int qtrle_encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size,
 
     if (avctx->gop_size == 0 || (s->avctx->frame_number % avctx->gop_size) == 0) {
         /* I-Frame */
-        p->pict_type = FF_I_TYPE;
+        p->pict_type = AV_PICTURE_TYPE_I;
         p->key_frame = 1;
     } else {
         /* P-Frame */
-        p->pict_type = FF_P_TYPE;
+        p->pict_type = AV_PICTURE_TYPE_P;
         p->key_frame = 0;
     }
 
@@ -321,14 +321,14 @@ static av_cold int qtrle_encode_end(AVCodecContext *avctx)
     return 0;
 }
 
-AVCodec qtrle_encoder = {
-    "qtrle",
-    AVMEDIA_TYPE_VIDEO,
-    CODEC_ID_QTRLE,
-    sizeof(QtrleEncContext),
-    qtrle_encode_init,
-    qtrle_encode_frame,
-    qtrle_encode_end,
+AVCodec ff_qtrle_encoder = {
+    .name           = "qtrle",
+    .type           = AVMEDIA_TYPE_VIDEO,
+    .id             = CODEC_ID_QTRLE,
+    .priv_data_size = sizeof(QtrleEncContext),
+    .init           = qtrle_encode_init,
+    .encode         = qtrle_encode_frame,
+    .close          = qtrle_encode_end,
     .pix_fmts = (const enum PixelFormat[]){PIX_FMT_RGB24, PIX_FMT_RGB555BE, PIX_FMT_ARGB, PIX_FMT_NONE},
     .long_name = NULL_IF_CONFIG_SMALL("QuickTime Animation (RLE) video"),
 };

@@ -3,20 +3,20 @@
  * Copyright (c) 2008 Vitor Sessak
  * Copyright (c) 2007 Bobby Bingham
  *
- * This file is part of FFmpeg.
+ * This file is part of Libav.
  *
- * FFmpeg is free software; you can redistribute it and/or
+ * Libav is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  *
- * FFmpeg is distributed in the hope that it will be useful,
+ * Libav is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
+ * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
@@ -36,7 +36,7 @@
  */
 static int link_filter(AVFilterContext *src, int srcpad,
                        AVFilterContext *dst, int dstpad,
-                       AVClass *log_ctx)
+                       void *log_ctx)
 {
     int ret;
     if ((ret = avfilter_link(src, srcpad, dst, dstpad))) {
@@ -55,7 +55,7 @@ static int link_filter(AVFilterContext *src, int srcpad,
  * @return a pointer (that need to be freed after use) to the name
  * between parenthesis
  */
-static char *parse_link_name(const char **buf, AVClass *log_ctx)
+static char *parse_link_name(const char **buf, void *log_ctx)
 {
     const char *start = *buf;
     char *name;
@@ -83,8 +83,8 @@ static char *parse_link_name(const char **buf, AVClass *log_ctx)
  * Create an instance of a filter, initialize and insert it in the
  * filtergraph in *ctx.
  *
+ * @param filt_ctx put here a filter context in case of successful creation and configuration, NULL otherwise.
  * @param ctx the filtergraph context
- * @param put here a filter context in case of successful creation and configuration, NULL otherwise.
  * @param index an index which is supposed to be unique for each filter instance added to the filtergraph
  * @param filt_name the name of the filter to create
  * @param args the arguments provided to the filter during its initialization
@@ -92,7 +92,7 @@ static char *parse_link_name(const char **buf, AVClass *log_ctx)
  * @return 0 in case of success, a negative AVERROR code otherwise
  */
 static int create_filter(AVFilterContext **filt_ctx, AVFilterGraph *ctx, int index,
-                         const char *filt_name, const char *args, AVClass *log_ctx)
+                         const char *filt_name, const char *args, void *log_ctx)
 {
     AVFilter *filt;
     char inst_name[30];
@@ -121,7 +121,7 @@ static int create_filter(AVFilterContext **filt_ctx, AVFilterGraph *ctx, int ind
         return ret;
     }
 
-    if (!strcmp(filt_name, "scale") && !strstr(args, "flags")) {
+    if (!strcmp(filt_name, "scale") && args && !strstr(args, "flags")) {
         snprintf(tmp_args, sizeof(tmp_args), "%s:%s",
                  args, ctx->scale_sws_opts);
         args = tmp_args;
@@ -141,6 +141,8 @@ static int create_filter(AVFilterContext **filt_ctx, AVFilterGraph *ctx, int ind
  * corresponding filter instance which is added to graph with
  * create_filter().
  *
+ * @param filt_ctx Pointer that is set to the created and configured filter
+ *                 context on success, set to NULL on failure.
  * @param filt_ctx put here a pointer to the created filter context on
  * success, NULL otherwise
  * @param buf pointer to the buffer to parse, *buf will be updated to
@@ -151,7 +153,7 @@ static int create_filter(AVFilterContext **filt_ctx, AVFilterGraph *ctx, int ind
  * @return 0 in case of success, a negative AVERROR code otherwise
  */
 static int parse_filter(AVFilterContext **filt_ctx, const char **buf, AVFilterGraph *graph,
-                        int index, AVClass *log_ctx)
+                        int index, void *log_ctx)
 {
     char *opts = NULL;
     char *name = av_get_token(buf, "=,;[\n");
@@ -201,7 +203,7 @@ static void insert_inout(AVFilterInOut **inouts, AVFilterInOut *element)
 
 static int link_filter_inouts(AVFilterContext *filt_ctx,
                               AVFilterInOut **curr_inputs,
-                              AVFilterInOut **open_inputs, AVClass *log_ctx)
+                              AVFilterInOut **open_inputs, void *log_ctx)
 {
     int pad = filt_ctx->input_count, ret;
 
@@ -249,7 +251,7 @@ static int link_filter_inouts(AVFilterContext *filt_ctx,
 }
 
 static int parse_inputs(const char **buf, AVFilterInOut **curr_inputs,
-                        AVFilterInOut **open_outputs, AVClass *log_ctx)
+                        AVFilterInOut **open_outputs, void *log_ctx)
 {
     int pad = 0;
 
@@ -284,7 +286,7 @@ static int parse_inputs(const char **buf, AVFilterInOut **curr_inputs,
 
 static int parse_outputs(const char **buf, AVFilterInOut **curr_inputs,
                          AVFilterInOut **open_inputs,
-                         AVFilterInOut **open_outputs, AVClass *log_ctx)
+                         AVFilterInOut **open_outputs, void *log_ctx)
 {
     int ret, pad = 0;
 
@@ -329,7 +331,7 @@ static int parse_outputs(const char **buf, AVFilterInOut **curr_inputs,
 
 int avfilter_graph_parse(AVFilterGraph *graph, const char *filters,
                          AVFilterInOut *open_inputs,
-                         AVFilterInOut *open_outputs, AVClass *log_ctx)
+                         AVFilterInOut *open_outputs, void *log_ctx)
 {
     int index = 0, ret;
     char chr = 0;
@@ -393,7 +395,9 @@ int avfilter_graph_parse(AVFilterGraph *graph, const char *filters,
     return 0;
 
  fail:
-    avfilter_graph_free(graph);
+    for (; graph->filter_count > 0; graph->filter_count--)
+        avfilter_free(graph->filters[graph->filter_count - 1]);
+    av_freep(&graph->filters);
     free_inout(open_inputs);
     free_inout(open_outputs);
     free_inout(curr_inputs);
