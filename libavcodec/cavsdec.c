@@ -490,7 +490,7 @@ static int decode_pic(AVSContext *h) {
             skip_bits(&s->gb,24);//time_code
         /* old sample clips were all progressive and no low_delay,
            bump stream revision if detected otherwise */
-        if((s->low_delay) || !(show_bits(&s->gb,9) & 1))
+        if (s->low_delay || !(show_bits(&s->gb,9) & 1))
             h->stream_revision = 1;
         /* similarly test top_field_first and repeat_first_field */
         else if(show_bits(&s->gb,11) & 3)
@@ -608,12 +608,21 @@ static int decode_pic(AVSContext *h) {
 static int decode_seq_header(AVSContext *h) {
     MpegEncContext *s = &h->s;
     int frame_rate_code;
+    int width, height;
 
     h->profile =         get_bits(&s->gb,8);
     h->level =           get_bits(&s->gb,8);
     skip_bits1(&s->gb); //progressive sequence
-    s->width =           get_bits(&s->gb,14);
-    s->height =          get_bits(&s->gb,14);
+
+    width  = get_bits(&s->gb, 14);
+    height = get_bits(&s->gb, 14);
+    if ((s->width || s->height) && (s->width != width || s->height != height)) {
+        av_log_missing_feature(s, "Width/height changing in CAVS is", 0);
+        return AVERROR_PATCHWELCOME;
+    }
+    s->width  = width;
+    s->height = height;
+
     skip_bits(&s->gb,2); //chroma format
     skip_bits(&s->gb,3); //sample_precision
     h->aspect_ratio =    get_bits(&s->gb,4);
@@ -655,7 +664,8 @@ static int cavs_decode_frame(AVCodecContext * avctx,void *data, int *data_size,
     if (buf_size == 0) {
         if (!s->low_delay && h->DPB[0].f.data[0]) {
             *data_size = sizeof(AVPicture);
-            *picture = *(AVFrame *) &h->DPB[0];
+            *picture = h->DPB[0].f;
+            memset(&h->DPB[0], 0, sizeof(h->DPB[0]));
         }
         return 0;
     }

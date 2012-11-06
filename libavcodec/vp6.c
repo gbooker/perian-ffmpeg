@@ -77,6 +77,10 @@ static int vp6_parse_header(VP56Context *s, const uint8_t *buf, int buf_size,
         cols = buf[3];  /* number of stored macroblock cols */
         /* buf[4] is number of displayed macroblock rows */
         /* buf[5] is number of displayed macroblock cols */
+        if (!rows || !cols) {
+            av_log(s->avctx, AV_LOG_ERROR, "Invalid size %dx%d\n", cols << 4, rows << 4);
+            return 0;
+        }
 
         if (!s->macroblocks || /* first frame */
             16*cols != s->avctx->coded_width ||
@@ -97,7 +101,7 @@ static int vp6_parse_header(VP56Context *s, const uint8_t *buf, int buf_size,
             vrt_shift = 5;
         s->sub_version = sub_version;
     } else {
-        if (!s->sub_version)
+        if (!s->sub_version || !s->avctx->coded_width || !s->avctx->coded_height)
             return 0;
 
         if (separated_coeff || !s->filter_header) {
@@ -233,7 +237,7 @@ static int vp6_build_huff_tree(VP56Context *s, uint8_t coeff_model[],
         nodes[map[2*i+1]].count = b + !b;
     }
 
-    free_vlc(vlc);
+    ff_free_vlc(vlc);
     /* then build the huffman tree according to probabilities */
     return ff_huff_build_tree(s->avctx, vlc, size, nodes, vp6_huff_cmp,
                               FF_HUFFMAN_FLAG_HNODE_FIRST);
@@ -383,7 +387,7 @@ static void vp6_parse_coeff_huffman(VP56Context *s)
                 if (coeff_idx)
                     break;
             } else {
-                if (get_bits_count(&s->gb) >= s->gb.size_in_bits)
+                if (get_bits_left(&s->gb) <= 0)
                     return;
                 coeff = get_vlc2(&s->gb, vlc_coeff->table, 9, 3);
                 if (coeff == 0) {
@@ -611,11 +615,11 @@ static av_cold int vp6_decode_free(AVCodecContext *avctx)
     ff_vp56_free(avctx);
 
     for (pt=0; pt<2; pt++) {
-        free_vlc(&s->dccv_vlc[pt]);
-        free_vlc(&s->runv_vlc[pt]);
+        ff_free_vlc(&s->dccv_vlc[pt]);
+        ff_free_vlc(&s->runv_vlc[pt]);
         for (ct=0; ct<3; ct++)
             for (cg=0; cg<6; cg++)
-                free_vlc(&s->ract_vlc[pt][ct][cg]);
+                ff_free_vlc(&s->ract_vlc[pt][ct][cg]);
     }
     return 0;
 }

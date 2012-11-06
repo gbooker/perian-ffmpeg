@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libavutil/intfloat_readwrite.h"
+#include "libavutil/intfloat.h"
 #include "avformat.h"
 #include "flv.h"
 #include "internal.h"
@@ -90,6 +90,7 @@ static int get_audio_flags(AVCodecContext *enc){
         case    11025:
             flags |= FLV_SAMPLERATE_11025HZ;
             break;
+        case    16000: //nellymoser only
         case     8000: //nellymoser only
         case     5512: //not mp3
             if(enc->codec_id != CODEC_ID_MP3){
@@ -125,6 +126,8 @@ static int get_audio_flags(AVCodecContext *enc){
     case CODEC_ID_NELLYMOSER:
         if (enc->sample_rate == 8000) {
             flags |= FLV_CODECID_NELLYMOSER_8KHZ_MONO | FLV_SAMPLESSIZE_16BIT;
+        } else if (enc->sample_rate == 16000) {
+            flags |= FLV_CODECID_NELLYMOSER_16KHZ_MONO | FLV_SAMPLESSIZE_16BIT;
         } else {
             flags |= FLV_CODECID_NELLYMOSER | FLV_SAMPLESSIZE_16BIT;
         }
@@ -162,7 +165,7 @@ static void put_avc_eos_tag(AVIOContext *pb, unsigned ts) {
 static void put_amf_double(AVIOContext *pb, double d)
 {
     avio_w8(pb, AMF_DATA_TYPE_NUMBER);
-    avio_wb64(pb, av_dbl2int(d));
+    avio_wb64(pb, av_double2int(d));
 }
 
 static void put_amf_bool(AVIOContext *pb, int b) {

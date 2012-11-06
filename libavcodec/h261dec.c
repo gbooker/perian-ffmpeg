@@ -66,7 +66,7 @@ static av_cold void h261_decode_init_vlc(H261Context *h){
         INIT_VLC_STATIC(&h261_cbp_vlc, H261_CBP_VLC_BITS, 63,
                  &h261_cbp_tab[0][1], 2, 1,
                  &h261_cbp_tab[0][0], 2, 1, 512);
-        init_rl(&h261_rl_tcoeff, ff_h261_rl_table_store);
+        ff_init_rl(&h261_rl_tcoeff, ff_h261_rl_table_store);
         INIT_VLC_RL(h261_rl_tcoeff, 552);
     }
 }
@@ -97,7 +97,7 @@ static av_cold int h261_decode_init(AVCodecContext *avctx){
 }
 
 /**
- * decodes the group of blocks header or slice header.
+ * Decode the group of blocks header or slice header.
  * @return <0 if an error occurred
  */
 static int h261_decode_gob_header(H261Context *h){
@@ -150,7 +150,7 @@ static int h261_decode_gob_header(H261Context *h){
 }
 
 /**
- * decodes the group of blocks / video packet header.
+ * Decode the group of blocks / video packet header.
  * @return <0 if no resync found
  */
 static int ff_h261_resync(H261Context *h){
@@ -191,7 +191,7 @@ static int ff_h261_resync(H261Context *h){
 }
 
 /**
- * decodes skipped macroblocks
+ * Decode skipped macroblocks.
  * @return 0
  */
 static int h261_decode_mb_skipped(H261Context *h, int mba1, int mba2 )
@@ -265,7 +265,7 @@ static int h261_decode_mb(H261Context *h){
     while( h->mba_diff == MBA_STUFFING ); // stuffing
 
     if ( h->mba_diff < 0 ){
-        if ( get_bits_count(&s->gb) + 7 >= s->gb.size_in_bits )
+        if (get_bits_left(&s->gb) <= 7)
             return SLICE_END;
 
         av_log(s->avctx, AV_LOG_ERROR, "illegal mba at %d %d\n", s->mb_x, s->mb_y);
@@ -355,7 +355,7 @@ intra:
 }
 
 /**
- * decodes a macroblock
+ * Decode a macroblock.
  * @return <0 if an error occurred
  */
 static int h261_decode_block(H261Context * h, DCTELEM * block,
@@ -437,7 +437,7 @@ static int h261_decode_block(H261Context * h, DCTELEM * block,
 }
 
 /**
- * decodes the H261 picture header.
+ * Decode the H.261 picture header.
  * @return <0 if no startcode found
  */
 static int h261_decode_picture_header(H261Context *h){
@@ -572,6 +572,8 @@ retry:
     //we need to set current_picture_ptr before reading the header, otherwise we cannot store anyting im there
     if (s->current_picture_ptr == NULL || s->current_picture_ptr->f.data[0]) {
         int i= ff_find_unused_picture(s, 0);
+        if (i < 0)
+            return i;
         s->current_picture_ptr= &s->picture[i];
     }
 

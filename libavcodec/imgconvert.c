@@ -612,7 +612,8 @@ static enum PixelFormat avcodec_find_best_pix_fmt1(int64_t pix_fmt_mask,
     /* find exact color match with smallest size */
     dst_pix_fmt = PIX_FMT_NONE;
     min_dist = 0x7fffffff;
-    for(i = 0;i < PIX_FMT_NB; i++) {
+    /* test only the first 64 pixel formats to avoid undefined behaviour */
+    for (i = 0; i < 64; i++) {
         if (pix_fmt_mask & (1ULL << i)) {
             loss = avcodec_get_pix_fmt_loss(i, src_pix_fmt, has_alpha) & loss_mask;
             if (loss == 0) {
@@ -1000,7 +1001,7 @@ static void deinterlace_bottom_field_inplace(uint8_t *src1, int src_wrap,
     uint8_t *src_m1, *src_0, *src_p1, *src_p2;
     int y;
     uint8_t *buf;
-    buf = (uint8_t*)av_malloc(width);
+    buf = av_malloc(width);
 
     src_m1 = src1;
     memcpy(buf,src_m1,width);

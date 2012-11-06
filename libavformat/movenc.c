@@ -32,7 +32,7 @@
 #include "libavcodec/put_bits.h"
 #include "internal.h"
 #include "libavutil/avstring.h"
-#include "libavutil/intfloat_readwrite.h"
+#include "libavutil/intfloat.h"
 #include "libavutil/mathematics.h"
 #include "libavutil/opt.h"
 #include "libavutil/dict.h"
@@ -46,6 +46,9 @@ static const AVOption options[] = {
     { "movflags", "MOV muxer flags", offsetof(MOVMuxContext, flags), AV_OPT_TYPE_FLAGS, {.dbl = 0}, INT_MIN, INT_MAX, AV_OPT_FLAG_ENCODING_PARAM, "movflags" },
     { "rtphint", "Add RTP hint tracks", 0, AV_OPT_TYPE_CONST, {.dbl = FF_MOV_FLAG_RTP_HINT}, INT_MIN, INT_MAX, AV_OPT_FLAG_ENCODING_PARAM, "movflags" },
     FF_RTP_FLAG_OPTS(MOVMuxContext, rtp_flags),
+    { "skip_iods", "Skip writing iods atom.", offsetof(MOVMuxContext, iods_skip), AV_OPT_TYPE_INT, {.dbl = 0}, 0, 1, AV_OPT_FLAG_ENCODING_PARAM},
+    { "iods_audio_profile", "iods audio profile atom.", offsetof(MOVMuxContext, iods_audio_profile), AV_OPT_TYPE_INT, {.dbl = -1}, -1, 255, AV_OPT_FLAG_ENCODING_PARAM},
+    { "iods_video_profile", "iods video profile atom.", offsetof(MOVMuxContext, iods_video_profile), AV_OPT_TYPE_INT, {.dbl = -1}, -1, 255, AV_OPT_FLAG_ENCODING_PARAM},
     { NULL },
 };
 
@@ -468,7 +471,7 @@ static int mov_write_audio_tag(AVIOContext *pb, MOVTrack *track)
         avio_wb16(pb, 0);
         avio_wb32(pb, 0x00010000);
         avio_wb32(pb, 72);
-        avio_wb64(pb, av_dbl2int(track->timescale));
+        avio_wb64(pb, av_double2int(track->timescale));
         avio_wb32(pb, track->enc->channels);
         avio_wb32(pb, 0x7F000000);
         avio_wb32(pb, av_get_bits_per_sample(track->enc->codec_id));
@@ -780,6 +783,23 @@ static int mov_write_uuid_tag_ipod(AVIOContext *pb)
     return 28;
 }
 
+static const uint16_t fiel_data[] = {
+    0x0000, 0x0100, 0x0201, 0x0206, 0x0209, 0x020e
+};
+
+static int mov_write_fiel_tag(AVIOContext *pb, MOVTrack *track)
+{
+    unsigned mov_field_order = 0;
+    if (track->enc->field_order < FF_ARRAY_ELEMS(fiel_data))
+        mov_field_order = fiel_data[track->enc->field_order];
+    else
+        return 0;
+    avio_wb32(pb, 10);
+    ffio_wfourcc(pb, "fiel");
+    avio_wb16(pb, mov_field_order);
+    return 10;
+}
+
 static int mov_write_subtitle_tag(AVIOContext *pb, MOVTrack *track)
 {
     int64_t pos = avio_tell(pb);
@@ -866,7 +886,9 @@ static int mov_write_video_tag(AVIOContext *pb, MOVTrack *track)
         mov_write_avcc_tag(pb, track);
         if(track->mode == MODE_IPOD)
             mov_write_uuid_tag_ipod(pb);
-    } else if(track->vosLen > 0)
+    } else if (track->enc->field_order != AV_FIELD_UNKNOWN)
+        mov_write_fiel_tag(pb, track);
+    else if(track->vosLen > 0)
         mov_write_glbl_tag(pb, track);
 
     if (track->enc->sample_aspect_ratio.den && track->enc->sample_aspect_ratio.num &&
@@ -1286,7 +1308,7 @@ static int mov_write_tapt_tag(AVIOContext *pb, MOVTrack *track)
     avio_wb32(pb, track->enc->height << 16);
 
     return updateSize(pb, pos);
-};
+}
 
 // This box seems important for the psp playback ... without it the movie seems to hang
 static int mov_write_edts_tag(AVIOContext *pb, MOVTrack *track)
@@ -1407,21 +1429,34 @@ static int mov_write_trak_tag(AVIOContext *pb, MOVTrack *track, AVStream *st)
     return updateSize(pb, pos);
 }
 
-#if 0
-/* TODO: Not sorted out, but not necessary either */
 static int mov_write_iods_tag(AVIOContext *pb, MOVMuxContext *mov)
 {
-    avio_wb32(pb, 0x15); /* size */
+    int i, has_audio = 0, has_video = 0;
+    int64_t pos = avio_tell(pb);
+    int audio_profile = mov->iods_audio_profile;
+    int video_profile = mov->iods_video_profile;
+    for (i = 0; i < mov->nb_streams; i++) {
+        if(mov->tracks[i].entry > 0) {
+            has_audio |= mov->tracks[i].enc->codec_type == AVMEDIA_TYPE_AUDIO;
+            has_video |= mov->tracks[i].enc->codec_type == AVMEDIA_TYPE_VIDEO;
+        }
+    }
+    if (audio_profile < 0)
+        audio_profile = 0xFF - has_audio;
+    if (video_profile < 0)
+        video_profile = 0xFF - has_video;
+    avio_wb32(pb, 0x0); /* size */
     ffio_wfourcc(pb, "iods");
     avio_wb32(pb, 0);    /* version & flags */
-    avio_wb16(pb, 0x1007);
-    avio_w8(pb, 0);
-    avio_wb16(pb, 0x4fff);
-    avio_wb16(pb, 0xfffe);
-    avio_wb16(pb, 0x01ff);
-    return 0x15;
+    putDescr(pb, 0x10, 7);
+    avio_wb16(pb, 0x004f);
+    avio_w8(pb, 0xff);
+    avio_w8(pb, 0xff);
+    avio_w8(pb, audio_profile);
+    avio_w8(pb, video_profile);
+    avio_w8(pb, 0xff);
+    return updateSize(pb, pos);
 }
-#endif
 
 static int mov_write_mvhd_tag(AVIOContext *pb, MOVMuxContext *mov)
 {
@@ -1829,7 +1864,8 @@ static int mov_write_moov_tag(AVIOContext *pb, MOVMuxContext *mov,
     }
 
     mov_write_mvhd_tag(pb, mov);
-    //mov_write_iods_tag(pb, mov);
+    if (mov->mode != MODE_MOV && !mov->iods_skip)
+        mov_write_iods_tag(pb, mov);
     for (i=0; i<mov->nb_streams; i++) {
         if(mov->tracks[i].entry > 0) {
             mov_write_trak_tag(pb, &(mov->tracks[i]), i < s->nb_streams ? s->streams[i] : NULL);
@@ -2281,7 +2317,8 @@ static int mov_write_header(AVFormatContext *s)
 #endif
     if (t = av_dict_get(s->metadata, "creation_time", NULL, 0))
         mov->time = ff_iso8601_to_unix_time(t->value);
-    mov->time += 0x7C25B080; //1970 based -> 1904 based
+    if (mov->time)
+        mov->time += 0x7C25B080; // 1970 based -> 1904 based
 
     if (mov->chapter_track)
         mov_create_chapter_track(s, mov->chapter_track);

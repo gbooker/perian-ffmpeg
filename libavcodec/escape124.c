@@ -21,7 +21,7 @@
 
 #include "avcodec.h"
 
-#define ALT_BITSTREAM_READER_LE
+#define BITSTREAM_READER_LE
 #include "get_bits.h"
 
 typedef union MacroBlock {
@@ -49,7 +49,7 @@ typedef struct Escape124Context {
 } Escape124Context;
 
 static int can_safely_read(GetBitContext* gb, int bits) {
-    return get_bits_count(gb) + bits <= gb->size_in_bits;
+    return get_bits_left(gb) >= bits;
 }
 
 /**

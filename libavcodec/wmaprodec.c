@@ -86,6 +86,7 @@
  * subframe in order to reconstruct the output samples.
  */
 
+#include "libavutil/intfloat.h"
 #include "libavutil/intreadwrite.h"
 #include "avcodec.h"
 #include "internal.h"
@@ -326,6 +327,11 @@ static av_cold int decode_init(AVCodecContext *avctx)
     if (s->max_num_subframes > MAX_SUBFRAMES) {
         av_log(avctx, AV_LOG_ERROR, "invalid number of subframes %i\n",
                s->max_num_subframes);
+        return AVERROR_INVALIDDATA;
+    }
+
+    if (s->avctx->sample_rate <= 0) {
+        av_log(avctx, AV_LOG_ERROR, "invalid sample rate\n");
         return AVERROR_INVALIDDATA;
     }
 
@@ -823,8 +829,8 @@ static int decode_coeffs(WMAProDecodeCtx *s, int c)
                     v1 = get_vlc2(&s->gb, vec1_vlc.table, VLCBITS, VEC1MAXDEPTH);
                     if (v1 == HUFF_VEC1_SIZE - 1)
                         v1 += ff_wma_get_large_val(&s->gb);
-                    vals[i  ] = ((av_alias32){ .f32 = v0 }).u32;
-                    vals[i+1] = ((av_alias32){ .f32 = v1 }).u32;
+                    vals[i  ] = av_float2int(v0);
+                    vals[i+1] = av_float2int(v1);
                 } else {
                     vals[i]   = fval_tab[symbol_to_vec2[idx] >> 4 ];
                     vals[i+1] = fval_tab[symbol_to_vec2[idx] & 0xF];
@@ -1165,7 +1171,12 @@ static int decode_subframe(WMAProDecodeCtx *s)
             int num_bits = av_log2((s->subframe_len + 3)/4) + 1;
             for (i = 0; i < s->channels_for_cur_subframe; i++) {
                 int c = s->channel_indexes_for_cur_subframe[i];
-                s->channel[c].num_vec_coeffs = get_bits(&s->gb, num_bits) << 2;
+                int num_vec_coeffs = get_bits(&s->gb, num_bits) << 2;
+                if (num_vec_coeffs > WMAPRO_BLOCK_MAX_SIZE) {
+                    av_log(s->avctx, AV_LOG_ERROR, "num_vec_coeffs %d is too large\n", num_vec_coeffs);
+                    return AVERROR_INVALIDDATA;
+                }
+                s->channel[c].num_vec_coeffs = num_vec_coeffs;
             }
         } else {
             for (i = 0; i < s->channels_for_cur_subframe; i++) {

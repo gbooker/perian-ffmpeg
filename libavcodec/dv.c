@@ -37,7 +37,7 @@
  * @file
  * DV codec.
  */
-#define ALT_BITSTREAM_READER
+
 #include "libavutil/pixdesc.h"
 #include "avcodec.h"
 #include "dsputil.h"
@@ -312,7 +312,7 @@ static av_cold int dvvideo_init(AVCodecContext *avctx)
             dv_rl_vlc[i].level = level;
             dv_rl_vlc[i].run   = run;
         }
-        free_vlc(&dv_vlc);
+        ff_free_vlc(&dv_vlc);
 
         dv_vlc_map_tableinit();
     }
@@ -757,7 +757,7 @@ static av_always_inline int dv_guess_dct_mode(DVVideoContext *s, uint8_t *data, 
         if (ps > 0) {
             int is = s->ildct_cmp(NULL, data           , NULL, linesize<<1, 4) +
                      s->ildct_cmp(NULL, data + linesize, NULL, linesize<<1, 4);
-            return (ps > is);
+            return ps > is;
         }
     }
 

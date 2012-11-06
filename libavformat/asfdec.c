@@ -202,6 +202,8 @@ static int asf_read_file_properties(AVFormatContext *s, int64_t size)
     asf->hdr.flags              = avio_rl32(pb);
     asf->hdr.min_pktsize        = avio_rl32(pb);
     asf->hdr.max_pktsize        = avio_rl32(pb);
+    if (asf->hdr.min_pktsize >= (1U<<29))
+        return AVERROR_INVALIDDATA;
     asf->hdr.max_bitrate        = avio_rl32(pb);
     s->packet_size = asf->hdr.max_pktsize;
 
@@ -616,7 +618,9 @@ static int asf_read_header(AVFormatContext *s, AVFormatParameters *ap)
         if (gsize < 24)
             return -1;
         if (!ff_guidcmp(&g, &ff_asf_file_header)) {
-            asf_read_file_properties(s, gsize);
+            int ret = asf_read_file_properties(s, gsize);
+            if (ret < 0)
+                return ret;
         } else if (!ff_guidcmp(&g, &ff_asf_stream_header)) {
             asf_read_stream_properties(s, gsize);
         } else if (!ff_guidcmp(&g, &ff_asf_comment_header)) {
@@ -757,7 +761,7 @@ static int ff_asf_get_packet(AVFormatContext *s, AVIOContext *pb)
         c= avio_r8(pb);
         d= avio_r8(pb);
         rsize+=3;
-    }else{
+    } else if (!pb->eof_reached) {
         avio_seek(pb, -1, SEEK_CUR); //FIXME
     }
 
@@ -788,6 +792,13 @@ static int ff_asf_get_packet(AVFormatContext *s, AVIOContext *pb)
     } else {
         asf->packet_segments = 1;
         asf->packet_segsizetype = 0x80;
+    }
+    if (rsize > packet_length - padsize) {
+        asf->packet_size_left = 0;
+        av_log(s, AV_LOG_ERROR,
+               "invalid packet header length %d for pktlen %d-%d at %"PRId64"\n",
+               rsize, packet_length, padsize, avio_tell(pb));
+        return -1;
     }
     asf->packet_size_left = packet_length - padsize - rsize;
     if (packet_length < asf->hdr.min_pktsize)
@@ -979,7 +990,7 @@ static int ff_asf_parse_packet(AVFormatContext *s, AVIOContext *pb, AVPacket *pk
             asf_st->packet_pos= asf->packet_pos;
             if (asf_st->pkt.data && asf_st->palette_changed) {
                 uint8_t *pal;
-                pal = av_packet_new_side_data(pkt, AV_PKT_DATA_PALETTE,
+                pal = av_packet_new_side_data(&asf_st->pkt, AV_PKT_DATA_PALETTE,
                                               AVPALETTE_SIZE);
                 if (!pal) {
                     av_log(s, AV_LOG_ERROR, "Cannot append palette to packet\n");
@@ -1081,6 +1092,8 @@ static int ff_asf_parse_packet(AVFormatContext *s, AVIOContext *pb, AVPacket *pk
             //printf("packet %d %d\n", asf_st->pkt.size, asf->packet_frag_size);
             asf_st->pkt.size = 0;
             asf_st->pkt.data = 0;
+            asf_st->pkt.side_data_elems = 0;
+            asf_st->pkt.side_data = NULL;
             break; // packet completed
         }
     }

@@ -162,8 +162,18 @@ static int bmp_decode_frame(AVCodecContext *avctx,
     case 16:
         if(comp == BMP_RGB)
             avctx->pix_fmt = PIX_FMT_RGB555;
-        if(comp == BMP_BITFIELDS)
-            avctx->pix_fmt = rgb[1] == 0x07E0 ? PIX_FMT_RGB565 : PIX_FMT_RGB555;
+        else if (comp == BMP_BITFIELDS) {
+            if (rgb[0] == 0xF800 && rgb[1] == 0x07E0 && rgb[2] == 0x001F)
+               avctx->pix_fmt = PIX_FMT_RGB565;
+            else if (rgb[0] == 0x7C00 && rgb[1] == 0x03E0 && rgb[2] == 0x001F)
+               avctx->pix_fmt = PIX_FMT_RGB555;
+            else if (rgb[0] == 0x0F00 && rgb[1] == 0x00F0 && rgb[2] == 0x000F)
+               avctx->pix_fmt = PIX_FMT_RGB444;
+            else {
+               av_log(avctx, AV_LOG_ERROR, "Unknown bitfields %0X %0X %0X\n", rgb[0], rgb[1], rgb[2]);
+               return AVERROR(EINVAL);
+            }
+        }
         break;
     case 8:
         if(hsize - ihsize - 14 > 0)
@@ -217,9 +227,6 @@ static int bmp_decode_frame(AVCodecContext *avctx,
     if(comp == BMP_RLE4 || comp == BMP_RLE8)
         memset(p->data[0], 0, avctx->height * p->linesize[0]);
 
-    if(depth == 4 || depth == 8)
-        memset(p->data[1], 0, 1024);
-
     if(height > 0){
         ptr = p->data[0] + (avctx->height - 1) * p->linesize[0];
         linesize = -p->linesize[0];
@@ -230,6 +237,9 @@ static int bmp_decode_frame(AVCodecContext *avctx,
 
     if(avctx->pix_fmt == PIX_FMT_PAL8){
         int colors = 1 << depth;
+
+        memset(p->data[1], 0, 1024);
+
         if(ihsize >= 36){
             int t;
             buf = buf0 + 46;

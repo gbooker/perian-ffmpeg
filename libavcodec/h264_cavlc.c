@@ -281,7 +281,7 @@ static int8_t cavlc_level_tab[7][1<<LEVEL_TAB_BITS][2];
 #define RUN7_VLC_BITS                  6
 
 /**
- * gets the predicted number of non-zero coefficients.
+ * Get the predicted number of non-zero coefficients.
  * @param n block index
  */
 static inline int pred_non_zero_count(H264Context *h, int n){
@@ -436,7 +436,7 @@ static inline int get_level_prefix(GetBitContext *gb){
 }
 
 /**
- * decodes a residual block.
+ * Decode a residual block.
  * @param n block index
  * @param scantable scantable
  * @param max_coeff number of coefficients in the block
@@ -822,12 +822,12 @@ decode_intra_mb:
             if( ff_h264_check_intra4x4_pred_mode(h) < 0)
                 return -1;
         }else{
-            h->intra16x16_pred_mode= ff_h264_check_intra_pred_mode(h, h->intra16x16_pred_mode);
+            h->intra16x16_pred_mode= ff_h264_check_intra_pred_mode(h, h->intra16x16_pred_mode, 0);
             if(h->intra16x16_pred_mode < 0)
                 return -1;
         }
         if(decode_chroma){
-            pred_mode= ff_h264_check_intra_pred_mode(h, get_ue_golomb_31(&s->gb));
+            pred_mode= ff_h264_check_intra_pred_mode(h, get_ue_golomb_31(&s->gb), 1);
             if(pred_mode < 0)
                 return -1;
             h->chroma_pred_mode= pred_mode;
